@@ -1,0 +1,98 @@
+---
+title: Filter batch and genomics data
+author: Christian Coffman
+format:
+  html:
+    code-fold: true
+    embed-resources: true
+---
+
+Author: Christian Coffman
+Date Created: 25-10-09
+Last Updated: 25-10-17
+[Further information](https://docs.google.com/document/d/1dYBvSBbSGM_-6453IT4EZkIUkvk6vaVQcLL-FPADz5Y/edit?tab=t.0)
+
+```{bash}
+dataDir=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_July2025/HBCD/
+release=2025october
+releaseDir=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_${release}/data/
+```
+
+
+```{r loadData}
+#| include: false
+
+library(tidyverse)
+library(testthat)
+library(kableExtra)
+
+dataDir <- "/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_July2025/HBCD/"
+release <- "2025october"
+releaseDir <- paste0("/projects/standard/basu_hbcd/shared/HBCD_genomics_release_", release, "/data/")
+
+
+fam <- read_table(paste0(dataDir, "HBCD.fam"), col_names=c("FID", "IID", "PAT", "MAT", "SEX", "PHENO")) |>
+  mutate(
+    IID2 = str_sub(IID, -10, -1),
+    FID2 = str_sub(IID, -10, -2)
+  )
+
+identifiers <- read_csv(paste0(releaseDir, "../release_identifiers_20251006.csv")) |>
+    mutate(release_candid = as.numeric(release_candid))
+
+parVisit <- read_table(paste0(releaseDir, "../par_visit_data.tsv")) |>
+  # filter(session_id == "V01") |>
+  # Genomics data only sampled once, so we can just use any occurence of a participant_id as a filter
+  # as opposed to imaging data which is collected every visit
+  distinct(participant_id)
+
+info <- read_table(paste0(releaseDir, "../batch.info"))
+```
+
+
+```{r joinNfilterFam}
+convTable <- fam %>%
+  left_join(identifiers, by = c("FID2" = "pscid")) |>
+  mutate(
+    pscidR = paste0(FID2, str_sub(IID, -1, -1)),
+    candid = as.numeric(candid)
+  ) |> 
+  filter(candid %in% parVisit$participant_id) |>
+  # this is redundant right now, but good to make sure controls are excluded
+  filter(!grepl("^NTC", FID)) |>
+  filter(!grepl("^Positive", FID))
+
+# fam |>
+#   mutate(IID = nchar(IID)) |>
+#   count(IID)
+#   filter(IID <20)
+  # Remove controls (they don't get assigned a pscid)
+
+
+info <- info |>  inner_join(convTable, by = c("IID" = "pscidR"))
+
+info |>
+  select(IID, plate_number, visit) |>
+  write_delim(paste0(releaseDir, "batch.info"), delim = "\t")
+
+info |>
+  distinct(`#FID` = FID, IID= IID.y) |>
+  write_delim(paste0(releaseDir, "../keepIDs.txt"), delim = "\t")
+```
+
+```{bash filterGenome}
+# create a separate file to handle duplicate ids
+awk '{
+    key = $1 FS $2;
+    count[key]++;
+    if (count[key] > 1) {
+        $2 = $2 "_" count[key];
+    }
+    print
+}' ${dataDir}HBCD.fam > ${releaseDir}../HBCD.fam
+plink2 --bfile ${dataDir}HBCD \
+  --fam ${releaseDir}../HBCD.fam \
+  --out ${releaseDir}HBCD \
+  --make-bed \
+  --keep ${releaseDir}../keepIDs.txt
+```
