@@ -1,0 +1,47 @@
+name: Update README Test Summary
+
+on:
+  push:
+    branches: [ main, master ] # Trigger on pushes to the main branch
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  update_readme:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        # CRITICAL: Fetches full history, required for the commit action
+        fetch-depth: 0 
+        
+    # --- 1. Read the Log File and Format Content ---
+    - name: Format Test Log Content
+      id: generate_content
+      run: |
+        # Read the content of the committed log file
+        LOG_CONTENT=$(cat test-log.txt)
+        
+        # Format it nicely for Markdown (e.g., inside a code block)
+        FORMATTED_CONTENT="## Last Local Test Summary\n\n\`\`\`text\n${LOG_CONTENT}\n\`\`\`"
+        
+        # Set the formatted string as a step output for the next action
+        echo "content<<EOF" >> $GITHUB_OUTPUT
+        echo -e "${FORMATTED_CONTENT}" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+      shell: bash
+      
+    # --- 2. Inject Content into README ---
+    - name: Inject content into README section
+      uses: Pitschi/action-renovate-readme@v1
+      with:
+        SECTION_NAME: test_summary
+        CONTENT: ${{ steps.generate_content.outputs.content }}
+        
+    # --- 3. Commit the Changes Back to the Repository ---
+    - name: Commit updated README
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "chore(readme): Auto-update test summary"
+        # Uses the GitHub Actions bot to make the commit
+        commit_user_name: 'github-actions[bot]'
+        commit_user_email: 'github-actions[bot]@users.noreply.github.com'
