@@ -7,30 +7,19 @@
 
 library(tidyverse)
 library(testthat)
-library(kableExtra)
 dataPrefix="/scratch.global/hbcd/full/full.QC8"
 release="br_20p1"
-releaseDir=paste0("../HBCD_genomics_release_", release, "/data/")
+releaseDir=paste0("../../../HBCD_genomics_release_", release, "/data/")
 
 fam <- read_table(paste0(releaseDir, "hbcd.fam"), col_names = c("FID", "IID", "PAT", "MAT", "SEX", "PHENO"))
 batch <- read_table(paste0(releaseDir, "batch.info"))
 excluded <- read_delim(paste0(releaseDir, "../excluded.txt"), delim = "\t")
 
-# fam and batch order
-mean(fam$IID == batch$IID)
-
-# deIDed checks
 combined <- full_join(fam, batch, by = "IID") |>
   full_join(excluded, by = "IID")
-
-combined |>
+idLengths <- combined |>
   mutate(FID = nchar(FID), IID = nchar(IID)) |>
   count(FID, IID)
-# only 10s and 11s means they were deID
-
-mean(is.numeric(combined$FID))
-
-
 iidTest <- full_join(fam, batch, by = "IID") |>
   full_join(excluded, by = "IID") |>
   mutate(
@@ -38,11 +27,18 @@ iidTest <- full_join(fam, batch, by = "IID") |>
     Relation = str_sub(IID, 11, 11),
   ) |>
   filter(! IID %in% excluded$IID)
+# missing FID are in the excluded file
 
-# missing FID should be in the excluded file
 
-# FID matches IID
-mean(iidTest$IID2 == iidTest$FID)
-
-# test relationships appended to FID to create IID
-mean((iidTest$Relation == "C") | (iidTest$Relation == "M"))
+test_that("Fam and batch order match", {
+  expect_equal(mean(fam$IID == batch$IID), 1)
+})
+test_that("DeID check: ID lengths are expected", {
+  expect_equal(mean(idLengths$FID %in% c(NA, 10)), 1)
+  expect_equal(mean(idLengths$IID %in% c(11)), 1)
+  expect_equal(mean(is.numeric(combined$FID)), 1)
+})
+test_that("DeID check: IID is composed of FID and either C or M", {
+  expect_equal(mean(iidTest$IID2 == iidTest$FID), 1)
+  expect_equal(mean((iidTest$Relation == "C") | (iidTest$Relation == "M")), 1)
+})

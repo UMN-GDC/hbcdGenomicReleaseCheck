@@ -1,0 +1,21 @@
+name: Test Log Artifact Uploader
+
+on: [push, pull_request]
+
+jobs:
+  upload_log:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      
+    - name: Download Test Log
+      # Checks out the 'test-log.txt' file you committed locally
+      run: |
+        cat test-log.txt 
+        
+    - name: Upload Test Log as Artifact
+      # Uploads the log file for easy viewing in the Actions interface
+      uses: actions/upload-artifact@v4
+      with:
+        name: Local-Test-Log
+        path: test-log.txt
