@@ -9,7 +9,7 @@ format:
 
 Author: Christian Coffman
 Date Created: 25-10-09
-Last Updated: 25-11-14
+Last Updated: 25-11-18
 [Further information](https://docs.google.com/document/d/1dYBvSBbSGM_-6453IT4EZkIUkvk6vaVQcLL-FPADz5Y/edit?tab=t.0)
 
 - Make sure to download the new exclusion list and parent visit file ahead of time
@@ -59,7 +59,7 @@ exc <- readxl::read_excel(paste0(releaseDir, "../HBCD_genetics_QC1.xlsx"), sheet
     pscid = str_sub(Study_ID, end =-2)
   ) |>
   select(-c(Study_ID, something, pscidR)) |>
-  drop_na(relationship)
+  drop_na(release_candid)
 
 # Identifiers stay same
 identifiers <- read_csv("../release_identifiers_20251006.csv") |>
@@ -108,7 +108,7 @@ combined |>
   filter(!grepl("^NA", IID)) |>
   # keeping excluded individuals since researchers might be interested in 
   # if many are excluded from same plate
-  write_delim(paste0(releaseDir, "batch.info"), delim = " ")
+  write_delim(paste0(releaseDir, "batch.info"), delim = "\t")
 
 
 # Write excludsion file
@@ -120,7 +120,8 @@ inclusion <- full_join(combined, exc, by = c("release_candid", "relationship")) 
 inclusion |>
   filter(!is.na(`Exclusion Reason`) | is.na(FID) | grepl("^NA", IID)) |>
   filter(!grepl("^NA", IID)) |>
-  write_delim(paste0(releaseDir, "../exclude.txt"), delim = " ")
+  select(IID, `Exclusion Reason`) |>
+  write_delim(paste0(releaseDir, "../exclude.txt"), delim = "\t")
 inclusion |>
   filter(is.na(`Exclusion Reason`) & !is.na(FID)) |>
   distinct(FID, IID) |>
