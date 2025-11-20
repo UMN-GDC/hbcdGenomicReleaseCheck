@@ -2,6 +2,11 @@
 .Rhistory
 .Rapp.history
 
+.bed
+.fam
+.bim
+.log
+
 .html
 # Session Data files
 .RData
