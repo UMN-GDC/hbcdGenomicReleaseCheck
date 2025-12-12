@@ -1,6 +1,15 @@
 HBCD genomics QC validation
 
-PLINK1 files in "data"
+# Running DEID and validate
+- Update release version in 01-setupNfilter.qmd for the shell portion and the R portion
+- Updated release version in tests/testthat/test-ids.R
+- Run 01-setupNfilter.qmd
+- Run 02-validate.R 
+- Checdk to see if test-log.txt is clean
+
+
+
+# Data for release
 - .bed
 - .bim
 - .fam
@@ -19,9 +28,3 @@ PLINK1 files in "data"
     - [ ] plate_number (float)
     - [ ] visit (character)
   - [ ] .fam and batch.info have the same ordering of IID column
-
-- [ ] Genomic Derivatives (in "data/derivatives" Under Construction)
-    - .eigenvec
-    - .eigenval
-    - Inferred Sex
-    - Inferred Ancestry
