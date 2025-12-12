@@ -9,7 +9,7 @@ format:
 
 Author: Christian Coffman
 Date Created: 25-10-09
-Last Updated: 25-11-18
+Last Updated: 25-12-12
 [Further information](https://docs.google.com/document/d/1dYBvSBbSGM_-6453IT4EZkIUkvk6vaVQcLL-FPADz5Y/edit?tab=t.0)
 
 - Make sure to download the new exclusion list and parent visit file ahead of time
@@ -17,15 +17,13 @@ Last Updated: 25-11-18
 ```{bash input}
 module load plink/2.00-alpha-091019
 dataPrefix=/scratch.global/hbcd/full/full.QC8
-release=br_20p1
+release=br_20p2
 releaseDir=../HBCD_genomics_release_${release}/data/
-parFile="https://hbcddatamanagement.slack.com/files/U09L9E6QRB4/F09SX7CB6AY/par_visit_data.tsv"
+parFile="${releaseDir}../par_visit_data.tsv"
 ```
 
 ```{bash setupDir}
 mkdir -p $releaseDir
-wget $parFile
-cp par_visit_data.tsv $releaseDir/..
 # push Ryans document to directory ahead of time
 # local computer
 # scp /c/Users/coffm049/Box/HBCD_genetics_QC/HBCD_genetics_QC1.xlsx coffm049@agate.msi.umn.edu:/projects/standard/basu_hbcd/shared/hbcdGenomicReleaseCheck
@@ -40,7 +38,7 @@ library(testthat)
 library(readxl)
 
 dataPrefix="/scratch.global/hbcd/full/full.QC8"
-release="br_20p1"
+release="br_20p2"
 releaseDir=paste0("../HBCD_genomics_release_", release, "/data/")
 batch <- read_table("/projects/standard/basu_hbcd/shared/batch.info") |>
   mutate(
@@ -50,7 +48,7 @@ batch <- read_table("/projects/standard/basu_hbcd/shared/batch.info") |>
   select(-IID)
 # parFile="https://hbcddatamanagement.slack.com/files/U09L9E6QRB4/F09SX7CB6AY/par_visit_data.tsv"
 # par file needs to be downloaded first before running this
-exc <- readxl::read_excel(paste0(releaseDir, "../HBCD_genetics_QC1.xlsx"), sheet = "Exclude_Summary") |>
+exc <- readxl::read_excel(paste0(releaseDir, "../HBCD_genetics_QC1_missing_race_LORIS.xlsx"), sheet = "Exclude_Summary") |>
   separate(`Sampled ID`, into = c("something", "release_candid", "pscidR"), sep = "_", remove = FALSE) |>
   mutate(
     release_candid = as.numeric(release_candid),
@@ -61,7 +59,7 @@ exc <- readxl::read_excel(paste0(releaseDir, "../HBCD_genetics_QC1.xlsx"), sheet
   drop_na(release_candid)
 
 # Identifiers stay same
-identifiers <- read_csv("../release_identifiers_20251006.csv") |>
+identifiers <- read_csv(paste0(releaseDir, "../release_identifiers_20251211.csv")) |>
     mutate(
       release_candid = as.numeric(release_candid),
       candid = as.numeric(candid),
@@ -78,7 +76,7 @@ fam <- read_table(paste0(dataPrefix, ".fam"), col_names=c("FID", "IID", "PAT", "
   select(-c(pscidR, FID, IID))
 
 
-parVisit <- read_table(paste0(releaseDir, "../par_visit_data.tsv")) |>
+parVisit <- read_table(paste0(releaseDir, "../par_visit_data_br20.2.tsv")) |>
   # filter(session_id == "V01") |>
   # Genomics data only sampled once, so we can just use any occurence of a participant_id as a filter
   # as opposed to imaging data which is collected every visit
@@ -112,16 +110,15 @@ combined |>
 
 
 # Write excludsion file
-inclusion <- full_join(combined, exc, by = c("release_candid", "relationship")) |>
+full_join(combined, exc, by = c("release_candid", "relationship")) |>
   mutate(
     FID = release_candid,
     IID = ifelse(!is.na(FID), paste0(FID, relationship), IID)
   ) |>
-  mutate(FID = ifelse(is.na(FID), 0, FID))
-inclusion |>
+  mutate(FID = ifelse(is.na(FID), 0, FID)) |>
   filter(!is.na(`Exclusion Reason`) | (FID == 0)) |>
   distinct(IID) |>
-  write_delim(paste0(releaseDir, "Removed_individuals.txt"), delim = " ", col_names = F)
+  write_delim(paste0(releaseDir, "../Removed_individuals.txt"), delim = " ", col_names = F)
 ```
 
 
@@ -129,7 +126,7 @@ inclusion |>
 plink2 --bfile $dataPrefix \
   --fam $releaseDir../temp.fam \
   --make-bed --out ${releaseDir}hbcd \
-  --remove ${releaseDir}Removed_individuals.txt
+  --remove ${releaseDir}../Removed_individuals.txt
 
 cd ${releaseDir} 
 rm *.log
