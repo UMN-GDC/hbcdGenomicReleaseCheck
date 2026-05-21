@@ -86,7 +86,7 @@ parVisit <- read_table(paste0(releaseDir, "../par_visit_data_br20.2.tsv")) |>
 combined <- left_join(fam, identifiers) |>
   left_join(batch) |>
   # this is a filter
-  left_join(parVisit) |>
+  right_join(parVisit) |>
   mutate(
     FID = release_candid,
     IID = paste0(FID, relationship),
