@@ -6,6 +6,12 @@
 .fam
 .bim
 .log
+.csv
+.txt
+.excel
+.xls
+.xlsx
+archive/*
 
 .html
 # Session Data files
