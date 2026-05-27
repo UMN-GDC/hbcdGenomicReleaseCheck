@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
+
+# source /projects/standard/basu_hbcd/shared/.venv/bin/activate
+
+
 """Filter batch and genomics data.
 
-Python translation of the R data-processing sections in 01-setupNfilter.qmd.
+Input:
+    - pre deIdentified Plink .fam 
+    - pre deIdentified demographics
+    - deIdenfified batch info 
+    - release deIdentification mapping
+    - par_visit table (not in use yet)
+Output:
+    - Subjects passing QC filter
 
-Reads raw PLINK .fam, batch info, identifiers, and an exclusion list, then
+
+Reads deIdentified PLINK .fam, batch info, identifiers, and an exclusion list, then (though it is not implemented yet)
 right-joins against the par_visit table so that only subjects present in
 par_visit survive.  Non-matching par_visit subjects get placeholder IDs
 (NA1, NA2, …) and are written into the removal file.
@@ -15,21 +27,24 @@ from pathlib import Path
 
 def main():
     # -- configuration --
-    data_prefix = Path("/scratch.global/hbcd/full/full.QC8")
-    release = "br_20p2"
-    release_dir = Path(f"../HBCD_genomics_release_{release}/data/")
+    projectDir = Path("/projects/standard/basu_hbcd/shared")
+    dataDir = projectDir / "data"
+    data_prefix = dataDir / "HBCD"
+    release = "br_21p2"
+    parVisit = "par_visit_data_br21_1.tsv"
+    release_dir = Path(f"/projects/standard/basu_hbcd/shared/HBCD_genomics_release_{release}/data/")
     release_dir.mkdir(parents=True, exist_ok=True)
     release_base = release_dir.parent  # ../HBCD_genomics_release_br_20p2/
 
-    # -- batch info --
-    batch = pd.read_csv("/projects/standard/basu_hbcd/shared/batch.info", sep=r"\s+")
+    # -- Genotype array batch info --
+    batch = pd.read_csv(dataDir / "batch.info", sep=r"\s+")
     batch["relationship"] = batch["IID"].str[-1]
     batch["release_candid"] = pd.to_numeric(batch["IID"].str[:-1])
     batch = batch.drop(columns=["IID"])
 
     # -- exclusion list --
     exc = pd.read_excel(
-        release_base / "HBCD_genetics_QC1_missing_race_LORIS.xlsx",
+        dataDir / "HBCD_genetics_QC1_missing_race_LORIS.xlsx",
         sheet_name="Exclude_Summary",
     )
     exc[["something", "release_candid", "pscidR"]] = exc["Sampled ID"].str.split(
@@ -43,11 +58,17 @@ def main():
         .dropna(subset=["release_candid"])
     )
 
-    # -- identifiers --
-    identifiers = pd.read_csv(release_base / "release_identifiers_20251211.csv")
-    identifiers["release_candid"] = pd.to_numeric(identifiers["release_candid"])
-    identifiers["candid"] = pd.to_numeric(identifiers["candid"])
-    identifiers = identifiers.dropna(subset=["release_candid"])
+    # -- de-identifiers --
+    
+
+    identifiers = (
+            pd.read_csv(dataDir / "release_identifiers_20260526.csv")
+            .query("release_candid != 'release_candid'") # filter some placeholders
+            .assign(release_candid = lambda x: pd.to_numeric(x["release_candid"]))
+            .assign(candid = lambda x: pd.to_numeric(x["candid"]))
+            .dropna(subset=["release_candid"])
+            .drop_duplicates(subset=['pscid', 'candid', 'release_candid'])
+    )
 
     # -- raw PLINK .fam --
     fam = pd.read_csv(
@@ -63,7 +84,7 @@ def main():
 
     # -- parent-visit table (used as a filter) --
     par_visit = pd.read_csv(
-        release_base / "par_visit_data_br20.2.tsv", sep="\t"
+        dataDir / "par_visit_data_br21_1.tsv", sep="\t"
     )
     par_visit = (
         par_visit[["participant_id"]]
@@ -72,10 +93,14 @@ def main():
         .rename(columns={"participant_id": "candid"})
     )
 
-    # -- combine / filter --
+    # -- filter --
     combined = fam.merge(identifiers, how="left")
     combined = combined.merge(batch, how="left")
-    combined = combined.merge(par_visit, how="right", on="candid")
+
+    ##### UNCOMMENT TO FILTER BY PAR_VISIT TABLE ##########
+    # combined = combined.merge(par_visit, how="right", on="candid")
+
+    ##################
 
     # de-identified FID / IID
     combined["FID"] = combined["release_candid"]
