@@ -53,13 +53,15 @@ def main():
 
     # -- merge to get de-identified IDs --
     combined = fam.merge(identifiers, how="left", on="pscid")
+    # use the .fam's original relationship so the batch merge is 1-to-1
+    combined = combined.rename(columns={"_orig_rel": "relationship"})
     combined = combined.merge(
-        batch, how="left", on=["release_candid"]
+        batch, how="left", on=["release_candid", "relationship"]
     )
 
     # -- de-identified FID / IID for ALL subjects --
     combined["new_FID"] = combined["release_candid"].fillna(0).astype(int)
-    combined["new_rel"] = combined["relationship"].fillna(combined["_orig_rel"])
+    combined["new_rel"] = combined["relationship"]
     combined["new_IID"] = combined["new_FID"].astype(str) + combined["new_rel"]
 
     # restore original .fam row order
