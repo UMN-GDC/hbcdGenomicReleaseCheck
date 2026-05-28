@@ -18,7 +18,12 @@ plink2 \
     --extract ${dataDIR}/Extracted_variants.txt\
     --keep "${releaseDir}/../keep_list.txt" \
     --make-bed --out "${releaseDir}/hbcd"
-    #--fam "${releaseDir}/../temp.fam" \
+
+# Ensure batch.info contains exactly the same subjects as hbcd.fam
+awk 'NR==FNR {keep[$2]; next} $1 in keep' \
+    "${releaseDir}/hbcd.fam" "${releaseDir}/batch.info" \
+    > "${releaseDir}/batch.info.tmp" \
+    && mv "${releaseDir}/batch.info.tmp" "${releaseDir}/batch.info"
 
 cd "${releaseDir}" || exit
 rm -f *.log
