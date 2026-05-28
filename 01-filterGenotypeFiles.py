@@ -24,7 +24,7 @@ from _lib import (
 def main():
     data_prefix = DATA_DIR / "HBCD"
     release_dir = Path(
-        "/projects/standard/basu_hbcd/shared/HBCD_genomics_br_20p2/data/"
+        "/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_20p2/data/"
     )
     release_dir.mkdir(parents=True, exist_ok=True)
     release_base = release_dir.parent
