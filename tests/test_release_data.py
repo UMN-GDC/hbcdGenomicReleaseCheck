@@ -226,3 +226,28 @@ def test_filter_correctness():
         f"{len(extra)} subject(s) in output but not expected: "
         f"{sorted(extra)[:10]}"
     )
+
+
+# ── variant integrity tests ─────────────────────────────────────────────────
+
+def test_variant_count_preserved():
+    """All variants in the source .bim are preserved in the output .bim.
+
+    Plink2's ``--keep`` filters subjects only; variants should pass through
+    unchanged, so the number of rows must be identical.
+    """
+    src = pd.read_csv(
+        str(DATA_DIR / "HBCD.bim"),
+        sep=r"\s+",
+        header=None,
+        names=["CHR", "SNP", "GD", "BP", "A1", "A2"],
+    )
+    out = pd.read_csv(
+        RELEASE_DIR / "hbcd.bim",
+        sep=r"\s+",
+        header=None,
+        names=["CHR", "SNP", "GD", "BP", "A1", "A2"],
+    )
+    assert len(src) == len(out), (
+        f"variant count mismatch: {len(src)} source vs {len(out)} output"
+    )
