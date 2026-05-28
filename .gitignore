@@ -12,7 +12,7 @@
 .xls
 .xlsx
 archive/*
-
+!test-log.txt
 .html
 # Session Data files
 .RData
