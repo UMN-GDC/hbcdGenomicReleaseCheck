@@ -138,14 +138,15 @@ def test_all_output_iids_in_par_visit():
             f"{sorted(missing)[:10]}"
         )
         # per-FID check: subject is OK if ANY of its candids is in par_visit
-        ok = ids_sub.groupby("release_candid")["candid"].apply(
-            lambda c: c.dropna().astype(int).isin(par_candids).any()
+        rc_ok = set(
+            rc
+            for rc, grp in ids_sub.groupby("release_candid")
+            if grp["candid"].dropna().astype(int).isin(par_candids).any()
         )
-        rc_ok = set(ok[ok].index) & rc_set
-        rc_bad = rc_set - rc_ok
-        assert len(rc_bad) == 0, (
-            f"{len(rc_bad)} subject(s) in {label} NOT in par_visit: "
-            f"{sorted(rc_bad)[:10]}"
+        bad = rc_set - rc_ok
+        assert len(bad) == 0, (
+            f"{len(bad)} subject(s) in {label} NOT in par_visit: "
+            f"{sorted(bad)[:10]}"
         )
         excluded_in = rc_set & exc_rc
         assert len(excluded_in) == 0, (
