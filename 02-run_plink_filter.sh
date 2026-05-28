@@ -8,13 +8,9 @@ dataDIR=/projects/standard/basu_hbcd/shared/data
 dataPrefix=/projects/standard/basu_hbcd/shared/data/HBCD
 releaseDir=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data
 
-awk '{print $2}' ${dataPrefix}.bim > ${dataDIR}/Extracted_variants.txt
-
 plink2 \
     --bfile $dataPrefix \
     --allow-extra-chr \
-    --set-all-var-ids chr@_#_\$r_\$a_b38 \
-    --extract ${dataDIR}/Extracted_variants.txt\
     --fam "${releaseDir}/../temp.fam" \
     --keep "${releaseDir}/../keep_list.txt" \
     --make-bed --out "${releaseDir}/hbcd"
