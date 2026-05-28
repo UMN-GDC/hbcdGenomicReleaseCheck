@@ -59,8 +59,6 @@ def main():
     )
 
     # -- de-identifiers --
-    
-
     identifiers = (
             pd.read_csv(dataDir / "release_identifiers_20260526.csv")
             .query("release_candid != 'release_candid'") # filter some placeholders
@@ -83,24 +81,20 @@ def main():
     fam = fam.drop(columns=["FID", "IID"])
 
     # -- parent-visit table (used as a filter) --
-    par_visit = pd.read_csv(
-        dataDir / "par_visit_data_br21_1.tsv", sep="\t"
-    )
     par_visit = (
-        par_visit[["participant_id"]]
-        .drop_duplicates()
-        .dropna()
-        .rename(columns={"participant_id": "candid"})
-    )
+            pd.read_csv(
+            dataDir / "par_visit_data_br21_1.tsv", sep="\t"
+        )
+            .query("par_visit_data_visit_missed == 'No'")
+            .rename(columns={"participant_id": "candid"})
+            .assign(candid=lambda x: x["candid"].apply(
+                lambda val: int(val[4:])))
+    )[["candid"]].drop_duplicates().dropna()
 
     # -- filter --
-    combined = fam.merge(identifiers, how="left")
-    combined = combined.merge(batch, how="left")
-
-    ##### UNCOMMENT TO FILTER BY PAR_VISIT TABLE ##########
-    # combined = combined.merge(par_visit, how="right", on="candid")
-
-    ##################
+    combined = fam.merge(identifiers, how="left", on = "pscid")
+    combined = combined.merge(batch, how="left", on = ["release_candid", "relationship"])
+    combined = combined[combined['release_candid'].isin(par_visit["candid"])]
 
     # de-identified FID / IID
     combined["FID"] = combined["release_candid"]
@@ -109,12 +103,16 @@ def main():
     )
     combined["FID"] = combined["FID"].fillna(0).astype(int)
 
+    # Exclude
+    combined = combined[~combined["FID"].isin(exc.release_candid)].dropna(subset = ["FID", "IID"])
+
     # Subjects in par_visit but NOT in the genomics data get placeholder
     # IIDs (NA1, NA2, …) so plink2 --remove can drop them later.
-    na_mask = combined["release_candid"].isna()
     combined.loc[na_mask, "IID"] = [
         f"NA{i+1}" for i in range(na_mask.sum())
     ]
+
+    sum(~combined["FID"].isin(par_visit["candid"]))
 
     # -- write temp.fam (space-delimited, no header) --
     combined[["FID", "IID", "PAT", "MAT", "SEX", "PHENO"]].to_csv(
