@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 DATA_DIR = Path("/projects/standard/basu_hbcd/shared/data")
-RELEASE = "br_21p2"
+RELEASE = "br_20p2"
 PAR_VISIT_FILE = "par_visit_data_br21_1.tsv"
 IDENTIFIERS_FILE = "release_identifiers_20260526.csv"
 EXCLUSION_FILE = "HBCD_genetics_QC1_missing_race_LORIS.xlsx"

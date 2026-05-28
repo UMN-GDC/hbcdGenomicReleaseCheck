@@ -13,12 +13,7 @@ from _lib import (
     load_excluded_release_candids,
 )
 
-RELEASE = "br_21p2"
-RELEASE_DIR = (
-    Path(__file__).resolve().parent.parent
-    / f"HBCD_genomics_release_{RELEASE}"
-    / "data"
-)
+RELEASE_DIR = Path("/projects/standard/basu_hbcd/shared/HBCD_genomics_br_20p2/data")
 
 
 def _load_data():
