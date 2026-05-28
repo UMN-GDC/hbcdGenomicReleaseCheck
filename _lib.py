@@ -20,7 +20,10 @@ def load_par_visit_candids(path=None):
     if path is None:
         path = DATA_DIR / PAR_VISIT_FILE
     pv = pd.read_csv(path, sep="\t").query("par_visit_data_visit_missed == 'No'")
-    ids = pv["participant_id"].dropna().apply(lambda v: int(str(v)[4:])).unique()
+    def _to_int(v):
+        s = str(v)
+        return int(s[4:] if s.startswith("sub-") else s)
+    ids = pv["participant_id"].dropna().apply(_to_int).unique()
     return set(int(x) for x in ids)
 
 
