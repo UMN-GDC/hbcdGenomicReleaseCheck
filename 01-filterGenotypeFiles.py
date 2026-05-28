@@ -90,7 +90,7 @@ def main():
     valid_release_candids = (
         set(
             int(v)
-            for v in identifiers[identifiers["candid"].isin(par_candids)][
+            for v in identifiers[identifiers["release_candid"].isin(par_candids)][
                 "release_candid"
             ]
             .dropna()

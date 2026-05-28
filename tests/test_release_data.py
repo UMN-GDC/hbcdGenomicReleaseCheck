@@ -130,25 +130,22 @@ def test_all_output_iids_in_par_visit():
 
     def _check_subjects(rc_set, label):
         """For each release_candid in rc_set, at least one identifiers row
-        must have its candid in par_visit, and none may be excluded."""
+        must have its release_candid in par_visit, and none may be excluded."""
         ids_sub = identifiers[identifiers["release_candid"].isin(rc_set)]
-        missing = rc_set - set(ids_sub["release_candid"].astype(int))
+        ids_rc = set(ids_sub["release_candid"].dropna().astype(int))
+        rc_py = set(int(v) for v in rc_set)
+        missing = rc_py - ids_rc
         assert len(missing) == 0, (
             f"{len(missing)} subject(s) in {label} missing from identifiers: "
             f"{sorted(missing)[:10]}"
         )
-        # per-FID check: subject is OK if ANY of its candids is in par_visit
-        rc_ok = set(
-            rc
-            for rc, grp in ids_sub.groupby("release_candid")
-            if grp["candid"].dropna().astype(int).isin(par_candids).any()
-        )
-        bad = rc_set - rc_ok
+        # FID (= release_candid) must be directly in par_visit's set
+        bad = rc_py - par_candids
         assert len(bad) == 0, (
             f"{len(bad)} subject(s) in {label} NOT in par_visit: "
             f"{sorted(bad)[:10]}"
         )
-        excluded_in = rc_set & exc_rc
+        excluded_in = rc_py & exc_rc
         assert len(excluded_in) == 0, (
             f"{len(excluded_in)} excluded subject(s) found in {label}: "
             f"{sorted(excluded_in)[:10]}"
@@ -178,7 +175,7 @@ def test_filter_correctness():
     expected_rc = (
         set(
             int(v)
-            for v in identifiers[identifiers["candid"].isin(par_candids)][
+            for v in identifiers[identifiers["release_candid"].isin(par_candids)][
                 "release_candid"
             ]
             .dropna()
