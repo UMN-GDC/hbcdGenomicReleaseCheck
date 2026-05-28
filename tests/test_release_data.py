@@ -128,45 +128,42 @@ def test_all_output_iids_in_par_visit():
     par_candids = load_par_visit_candids()
     exc_rc = load_excluded_release_candids()
 
+    def _check_subjects(rc_set, label):
+        """For each release_candid in rc_set, at least one identifiers row
+        must have its candid in par_visit, and none may be excluded."""
+        ids_sub = identifiers[identifiers["release_candid"].isin(rc_set)]
+        missing = rc_set - set(ids_sub["release_candid"].astype(int))
+        assert len(missing) == 0, (
+            f"{len(missing)} subject(s) in {label} missing from identifiers: "
+            f"{sorted(missing)[:10]}"
+        )
+        # per-FID check: subject is OK if ANY of its candids is in par_visit
+        ok = ids_sub.groupby("release_candid")["candid"].apply(
+            lambda c: c.dropna().astype(int).isin(par_candids).any()
+        )
+        rc_ok = set(ok[ok].index) & rc_set
+        rc_bad = rc_set - rc_ok
+        assert len(rc_bad) == 0, (
+            f"{len(rc_bad)} subject(s) in {label} NOT in par_visit: "
+            f"{sorted(rc_bad)[:10]}"
+        )
+        excluded_in = rc_set & exc_rc
+        assert len(excluded_in) == 0, (
+            f"{len(excluded_in)} excluded subject(s) found in {label}: "
+            f"{sorted(excluded_in)[:10]}"
+        )
+
     # hbcd.fam: use FID column (release_candid)
     fids = set(fam["FID"].unique()) - {0}
-    ids_sub = identifiers[identifiers["release_candid"].isin(fids)]
-    missing = fids - set(ids_sub["release_candid"].astype(int))
-    assert len(missing) == 0, (
-        f"{len(missing)} FID(s) in hbcd.fam missing from identifiers: "
-        f"{sorted(missing)[:10]}"
-    )
-    candids_out = set(ids_sub["candid"].dropna().astype(int))
-    orphans = candids_out - par_candids
-    assert len(orphans) == 0, (
-        f"{len(orphans)} subject(s) in hbcd.fam NOT in par_visit: "
-        f"{sorted(orphans)[:10]}"
-    )
-    excluded_in = fids & exc_rc
-    assert len(excluded_in) == 0, (
-        f"{len(excluded_in)} excluded subject(s) found in hbcd.fam: "
-        f"{sorted(excluded_in)[:10]}"
-    )
+    _check_subjects(fids, "hbcd.fam")
 
     # batch.info: no FID column; extract release_candid from IID
-    batch_rc = set(pd.to_numeric(batch["IID"].str[:-1], errors="coerce").dropna().astype(int))
-    ids_sub = identifiers[identifiers["release_candid"].isin(batch_rc)]
-    missing = batch_rc - set(ids_sub["release_candid"].astype(int))
-    assert len(missing) == 0, (
-        f"{len(missing)} subject(s) in batch.info missing from identifiers: "
-        f"{sorted(missing)[:10]}"
+    batch_rc = set(
+        pd.to_numeric(batch["IID"].str[:-1], errors="coerce")
+        .dropna()
+        .astype(int)
     )
-    candids_out = set(ids_sub["candid"].dropna().astype(int))
-    orphans = candids_out - par_candids
-    assert len(orphans) == 0, (
-        f"{len(orphans)} subject(s) in batch.info NOT in par_visit: "
-        f"{sorted(orphans)[:10]}"
-    )
-    excluded_in = batch_rc & exc_rc
-    assert len(excluded_in) == 0, (
-        f"{len(excluded_in)} excluded subject(s) found in batch.info: "
-        f"{sorted(excluded_in)[:10]}"
-    )
+    _check_subjects(batch_rc, "batch.info")
 
 
 def test_filter_correctness():

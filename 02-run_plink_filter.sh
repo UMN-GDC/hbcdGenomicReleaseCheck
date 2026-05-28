@@ -11,12 +11,13 @@ releaseDir=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/dat
 plink2 \
     --bfile $dataPrefix \
     --allow-extra-chr \
+    --set-all-var-ids chr@_#_\$r_\$a_b38 \
     --fam "${releaseDir}/../temp.fam" \
     --keep "${releaseDir}/../keep_list.txt" \
     --make-bed --out "${releaseDir}/hbcd"
 
 # Ensure batch.info contains exactly the same subjects as hbcd.fam
-awk 'NR==FNR {keep[$2]; next} $1 in keep' \
+awk 'NR==FNR {keep[$2]; next} FNR==1 || $1 in keep' \
     "${releaseDir}/hbcd.fam" "${releaseDir}/batch.info" \
     > "${releaseDir}/batch.info.tmp" \
     && mv "${releaseDir}/batch.info.tmp" "${releaseDir}/batch.info"
