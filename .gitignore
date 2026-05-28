@@ -29,7 +29,7 @@ archive/*
 
 # Output files from R CMD check
 /*.Rcheck/
-
+**/__pycache__/
 # RStudio files
 .Rproj.user/
 
