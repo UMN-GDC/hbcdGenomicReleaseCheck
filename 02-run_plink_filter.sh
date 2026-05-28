@@ -5,10 +5,10 @@
 module load plink/2.00-alpha-091019
 
 dataDIR=/projects/standard/basu_hbcd/shared/data
-dataPrefix=/projects/standard/basu_hbcd/shared/archive/HBCD_genomics_release_br_20p1/data/hbcd
+dataPrefix=/projects/standard/basu_hbcd/shared/data/HBCD
 releaseDir=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data
 
-awk '{print $2}' ${dataPrefix}.bim > ${releaseDir}/../Extracted_variants.txt
+awk '{print $2}' ${dataPrefix}.bim > ${dataDIR}/Extracted_variants.txt
 
 plink2 \
     --bfile $dataPrefix \

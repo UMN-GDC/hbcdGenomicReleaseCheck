@@ -22,10 +22,7 @@ from _lib import (
 
 
 def main():
-    data_prefix = Path(
-        "/projects/standard/basu_hbcd/shared/archive/"
-        "HBCD_genomics_release_br_20p1/data/hbcd"
-    )
+    data_prefix = DATA_DIR / "HBCD"
     release_dir = Path(
         "/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data/"
     )
