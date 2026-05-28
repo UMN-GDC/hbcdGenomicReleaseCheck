@@ -78,17 +78,7 @@ successful run.
 
 ```bash
 # activate environment, then:
-python -m pytest tests/test_release_data.py -v
-
-# or via the wrapper script (logs to test-log.txt):
-python XX-validate.py
-```
-
-### Full pipeline + validate
-
-```bash
-python 01-filterGenotypeFiles.py && bash 02-run_plink_filter.sh
-python -m pytest tests/test_release_data.py -v
+pytest --junitxml=tests.xml
 ```
 
 ### Dependencies
