@@ -165,14 +165,15 @@ def test_all_output_iids_in_par_visit():
 
 
 def test_filter_correctness():
-    """Re-derive the expected subject set from par_visit \\ excluded +
-    batch-data availability and verify it exactly matches hbcd.fam."""
+    """Re-derive the expected subject set using the pipeline's own
+    merge-and-filter logic (identifiers + batch + relationship),
+    then verify it exactly matches hbcd.fam."""
     identifiers = load_identifiers()
     par_candids = load_par_visit_candids()
     exc_rc = load_excluded_release_candids()
 
-    # subjects in par_visit, mapped to release_candid, minus excluded
-    expected_rc = (
+    # valid_set = par_visit release_candids minus excluded
+    valid_rc = (
         set(
             int(v)
             for v in identifiers[identifiers["release_candid"].isin(par_candids)][
@@ -184,21 +185,32 @@ def test_filter_correctness():
         - exc_rc
     )
 
-    # restrict to release_candids that actually exist in the input data
+    # temp.fam = ALL raw subjects (de-identified).  Extract relationship
+    # from the last character of IID (= {release_candid}{rel}).
     temp = _load_temp_fam()
-    rc_in_data = set(temp["FID"].unique()) - {0}
-    expected_rc &= rc_in_data
+    temp["_rel"] = temp["IID"].astype(str).str[-1]
 
-    # restrict to subjects that have batch data (mirrors the pipeline's
-    # dropna(subset=["visit", "plate_number"]) in 01-filterGenotypeFiles.py)
+    # Input batch.info — same relationship decoding
     input_batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
-    batch_rc = set(
-        pd.to_numeric(input_batch["IID"].str[:-1], errors="coerce")
-        .dropna()
-        .astype(int)
-        .unique()
+    input_batch["_rel"] = input_batch["IID"].str[-1]
+    input_batch["_rc"] = pd.to_numeric(input_batch["IID"].str[:-1])
+    input_batch = input_batch.drop(columns=["IID"])
+
+    # Emulate the pipeline's merge + relationship filter + NaN drop.
+    # Inner merge keeps only subjects whose relationship exists in batch,
+    # exactly like the pipeline's relationship == _orig_rel filter.
+    merged = temp.merge(
+        input_batch,
+        left_on=["FID", "_rel"],
+        right_on=["_rc", "_rel"],
+        how="inner",
     )
-    expected_rc &= batch_rc
+    ok = (
+        merged["FID"].isin(valid_rc)
+        & merged["visit"].notna()
+        & merged["plate_number"].notna()
+    )
+    expected_rc = set(merged.loc[ok, "FID"].unique()) - {0}
 
     # actual FIDs in the output hbcd.fam
     fam, _, _ = _load_data()
