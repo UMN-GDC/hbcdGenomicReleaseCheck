@@ -6,7 +6,12 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
-from _lib import load_par_visit_candids, load_identifiers, load_excluded_release_candids
+from _lib import (
+    DATA_DIR,
+    load_par_visit_candids,
+    load_identifiers,
+    load_excluded_release_candids,
+)
 
 RELEASE = "br_21p2"
 RELEASE_DIR = (
@@ -166,8 +171,8 @@ def test_all_output_iids_in_par_visit():
 
 
 def test_filter_correctness():
-    """Re-derive the expected subject set from par_visit \\ excluded and
-    verify it exactly matches hbcd.fam — the if-and-only-if constraint."""
+    """Re-derive the expected subject set from par_visit \\ excluded +
+    batch-data availability and verify it exactly matches hbcd.fam."""
     identifiers = load_identifiers()
     par_candids = load_par_visit_candids()
     exc_rc = load_excluded_release_candids()
@@ -185,12 +190,23 @@ def test_filter_correctness():
         - exc_rc
     )
 
-    # restrict to release_candids that actually exist in the data
+    # restrict to release_candids that actually exist in the input data
     temp = _load_temp_fam()
     rc_in_data = set(temp["FID"].unique()) - {0}
     expected_rc &= rc_in_data
 
-    # actual FIDs in the output
+    # restrict to subjects that have batch data (mirrors the pipeline's
+    # dropna(subset=["visit", "plate_number"]) in 01-filterGenotypeFiles.py)
+    input_batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
+    batch_rc = set(
+        pd.to_numeric(input_batch["IID"].str[:-1], errors="coerce")
+        .dropna()
+        .astype(int)
+        .unique()
+    )
+    expected_rc &= batch_rc
+
+    # actual FIDs in the output hbcd.fam
     fam, _, _ = _load_data()
     actual_rc = set(fam["FID"].unique()) - {0}
 
