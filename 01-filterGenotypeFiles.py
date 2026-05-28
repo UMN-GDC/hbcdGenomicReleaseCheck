@@ -4,13 +4,9 @@
 
 """Filter batch and genomics data.
 
-Reads de-identified PLINK .fam, batch info, identifiers, and an exclusion
-list, keeps only subjects that appear in par_visit *and* are not on the
-exclusion list, then writes filtered output files.
-
-The par_visit / exclusion filter is applied as a single inclusive set:
-    valid_release_candids = par_visit_candids → identifiers → release_candid
-                           \\ excluded_release_candids
+Rewrites the entire PLINK .fam with de-identified IDs (ALL original
+subjects), then writes a keep_list for plink2 --keep so only subjects
+in par_visit *and* not on the exclusion list survive in the final .bed.
 """
 import pandas as pd
 import numpy as np
@@ -26,7 +22,6 @@ from _lib import (
 
 
 def main():
-    # -- configuration --
     data_prefix = DATA_DIR / "HBCD"
     release = "br_21p2"
     release_dir = Path(
@@ -35,54 +30,43 @@ def main():
     release_dir.mkdir(parents=True, exist_ok=True)
     release_base = release_dir.parent
 
-    # -- Genotype array batch info --
+    # -- identifiers --
+    identifiers = load_identifiers()
+
+    # -- batch info --
     batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
     batch["relationship"] = batch["IID"].str[-1]
     batch["release_candid"] = pd.to_numeric(batch["IID"].str[:-1])
     batch = batch.drop(columns=["IID"])
 
-    # -- identifiers --
-    identifiers = load_identifiers()
-
-    # -- raw PLINK .fam --
+    # -- original PLINK .fam (ALL subjects) --
     fam = pd.read_csv(
         str(data_prefix) + ".fam",
         sep=r"\s+",
         header=None,
         names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
     )
+    fam["_idx"] = range(len(fam))
     fam["pscid"] = fam["IID"].str[-10:-1]
-    fam["relationship"] = fam["IID"].str[-1]
+    fam["_orig_rel"] = fam["IID"].str[-1]
     fam["PHENO"] = "NONE"
-    fam = fam.drop(columns=["FID", "IID"])
 
-    # -- combine data --
+    # -- merge to get de-identified IDs --
     combined = fam.merge(identifiers, how="left", on="pscid")
-    combined = combined.merge(batch, how="left", on=["release_candid", "relationship"])
-
-    # -- single inclusive filter: valid_release_candid = par_visit \\ excluded --
-    par_candids = load_par_visit_candids()
-    exc_release_candids = load_excluded_release_candids()
-
-    valid_release_candids = (
-        set(
-            identifiers[identifiers["candid"].isin(par_candids)][
-                "release_candid"
-            ]
-            .astype(int)
-            .unique()
-        )
-        - exc_release_candids
+    combined = combined.merge(
+        batch, how="left", on=["release_candid", "relationship"]
     )
-    combined = combined[combined["release_candid"].isin(valid_release_candids)]
 
-    # -- de-identified FID / IID --
-    combined["FID"] = combined["release_candid"]
-    combined["IID"] = combined["FID"].astype(str) + combined["relationship"].fillna("")
-    combined["FID"] = combined["FID"].fillna(0).astype(int)
+    # -- de-identified FID / IID for ALL subjects --
+    combined["new_FID"] = combined["release_candid"].fillna(0).astype(int)
+    combined["new_rel"] = combined["relationship"].fillna(combined["_orig_rel"])
+    combined["new_IID"] = combined["new_FID"].astype(str) + combined["new_rel"]
 
-    # -- write temp.fam (space-delimited, no header) --
-    combined[["FID", "IID", "PAT", "MAT", "SEX", "PHENO"]].to_csv(
+    # restore original .fam row order
+    combined = combined.sort_values("_idx")
+
+    # -- write temp.fam with ALL subjects (de-identified, same order) --
+    combined[["new_FID", "new_IID", "PAT", "MAT", "SEX", "PHENO"]].to_csv(
         release_base / "temp.fam",
         sep=" ",
         index=False,
@@ -90,14 +74,41 @@ def main():
         na_rep="NA",
     )
 
-    # -- write batch.info (tab-delimited) --
-    combined[["IID", "visit", "plate_number"]].to_csv(
+    # -- single inclusive filter: valid = par_visit \\ excluded --
+    par_candids = load_par_visit_candids()
+    exc_release_candids = load_excluded_release_candids()
+
+    valid_release_candids = (
+        set(
+            int(v)
+            for v in identifiers[identifiers["candid"].isin(par_candids)][
+                "release_candid"
+            ]
+            .dropna()
+            .unique()
+        )
+        - exc_release_candids
+    )
+
+    combined["_valid"] = combined["release_candid"].isin(valid_release_candids)
+    valid = combined[combined["_valid"]]
+
+    # -- write keep_list.txt for plink2 --keep --
+    valid[["new_FID", "new_IID"]].to_csv(
+        release_base / "keep_list.txt",
+        sep=" ",
+        index=False,
+        header=False,
+    )
+
+    # -- write batch.info (only valid subjects) --
+    valid[["new_IID", "visit", "plate_number"]].to_csv(
         release_dir / "batch.info",
         sep="\t",
         index=False,
     )
 
-    # -- write exclusion file (Removed_individuals.txt) --
+    # -- write Removed_individuals.txt (excluded subjects, documentation) --
     exc = load_excluded_with_relationship()
     exc["IID"] = (
         exc["release_candid"].astype(int).astype(str)

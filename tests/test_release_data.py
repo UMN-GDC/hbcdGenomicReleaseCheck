@@ -145,17 +145,42 @@ def test_all_output_iids_in_par_visit():
     )
 
 
-def test_pipeline_no_subjects_lost_or_gained():
-    """set(temp.fam IIDs) == set(hbcd.fam IIDs) ∪ set(Removed_individuals IIDs)."""
-    fam, _, excluded = _load_data()
-    temp_fam = _load_temp_fam()
+def test_filter_correctness():
+    """Re-derive the expected subject set from par_visit \\ excluded and
+    verify it exactly matches hbcd.fam — the if-and-only-if constraint."""
+    identifiers = load_identifiers()
+    par_candids = load_par_visit_candids()
+    exc_rc = load_excluded_release_candids()
 
-    output = set(fam["IID"])
-    removed = set(excluded["IID"])
-    temp = set(temp_fam["IID"])
-    union = output | removed
+    # subjects in par_visit, mapped to release_candid, minus excluded
+    expected_rc = (
+        set(
+            int(v)
+            for v in identifiers[identifiers["candid"].isin(par_candids)][
+                "release_candid"
+            ]
+            .dropna()
+            .unique()
+        )
+        - exc_rc
+    )
 
-    extra = union - temp
-    assert len(extra) == 0, f"IIDs in output/removed NOT in temp.fam: {sorted(extra)[:10]}"
-    missing = temp - union
-    assert len(missing) == 0, f"IIDs in temp.fam missing from both: {sorted(missing)[:10]}"
+    # restrict to release_candids that actually exist in the data
+    temp = _load_temp_fam()
+    rc_in_data = set(temp["FID"].unique()) - {0}
+    expected_rc &= rc_in_data
+
+    # actual FIDs in the output
+    fam, _, _ = _load_data()
+    actual_rc = set(fam["FID"].unique()) - {0}
+
+    missing = expected_rc - actual_rc
+    extra = actual_rc - expected_rc
+    assert len(missing) == 0, (
+        f"{len(missing)} subject(s) expected in output but missing: "
+        f"{sorted(missing)[:10]}"
+    )
+    assert len(extra) == 0, (
+        f"{len(extra)} subject(s) in output but not expected: "
+        f"{sorted(extra)[:10]}"
+    )

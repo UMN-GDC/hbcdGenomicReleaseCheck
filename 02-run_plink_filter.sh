@@ -17,8 +17,8 @@ plink2 \
     --set-all-var-ids chr@_#_\$r_\$a_b38 \
     --extract ${dataDIR}/Extracted_variants.txt\
     --fam "${releaseDir}/../temp.fam" \
-    --make-bed --out "${releaseDir}/hbcd" \
-    --remove "${releaseDir}/../Removed_individuals.txt"
+    --keep "${releaseDir}/../keep_list.txt" \
+    --make-bed --out "${releaseDir}/hbcd"
 
 cd "${releaseDir}" || exit
 rm -f *.log
