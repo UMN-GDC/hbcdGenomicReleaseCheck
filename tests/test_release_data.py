@@ -68,6 +68,7 @@ def _id_lengths(iid_test):
 def test_fam_and_batch_order_matches():
     fam, batch, _ = _load_data()
     assert (fam["IID"] == batch["IID"]).mean() == 1.0
+    assert set(fam["IID"]) == set(batch["IID"]), "fam / batch IID sets differ"
 
 
 def test_deid_fid_length_is_10_or_na():
@@ -115,33 +116,51 @@ def _load_temp_fam():
 
 
 def test_all_output_iids_in_par_visit():
-    """Every output IID maps (via identifiers) to a par_visit candid, and is
+    """Every output IID (fam *and* batch) maps to a par_visit candid and is
     NOT in the exclusion list."""
-    fam, _, _ = _load_data()
+    fam, batch, _ = _load_data()
     identifiers = load_identifiers()
     par_candids = load_par_visit_candids()
     exc_rc = load_excluded_release_candids()
 
+    # hbcd.fam: use FID column (release_candid)
     fids = set(fam["FID"].unique()) - {0}
-
-    # every FID must appear in identifiers
     ids_sub = identifiers[identifiers["release_candid"].isin(fids)]
-    missing_fids = fids - set(ids_sub["release_candid"].astype(int))
-    assert len(missing_fids) == 0, (
-        f"{len(missing_fids)} FID(s) missing from identifiers"
+    missing = fids - set(ids_sub["release_candid"].astype(int))
+    assert len(missing) == 0, (
+        f"{len(missing)} FID(s) in hbcd.fam missing from identifiers: "
+        f"{sorted(missing)[:10]}"
     )
-
-    # every FID's candid must be in par_visit
     candids_out = set(ids_sub["candid"].dropna().astype(int))
     orphans = candids_out - par_candids
     assert len(orphans) == 0, (
-        f"{len(orphans)} output subject(s) NOT in par_visit"
+        f"{len(orphans)} subject(s) in hbcd.fam NOT in par_visit: "
+        f"{sorted(orphans)[:10]}"
+    )
+    excluded_in = fids & exc_rc
+    assert len(excluded_in) == 0, (
+        f"{len(excluded_in)} excluded subject(s) found in hbcd.fam: "
+        f"{sorted(excluded_in)[:10]}"
     )
 
-    # no excluded subject appears in output
-    excluded_in_output = fids & exc_rc
-    assert len(excluded_in_output) == 0, (
-        f"{len(excluded_in_output)} excluded subject(s) found in output"
+    # batch.info: no FID column; extract release_candid from IID
+    batch_rc = set(pd.to_numeric(batch["IID"].str[:-1], errors="coerce").dropna().astype(int))
+    ids_sub = identifiers[identifiers["release_candid"].isin(batch_rc)]
+    missing = batch_rc - set(ids_sub["release_candid"].astype(int))
+    assert len(missing) == 0, (
+        f"{len(missing)} subject(s) in batch.info missing from identifiers: "
+        f"{sorted(missing)[:10]}"
+    )
+    candids_out = set(ids_sub["candid"].dropna().astype(int))
+    orphans = candids_out - par_candids
+    assert len(orphans) == 0, (
+        f"{len(orphans)} subject(s) in batch.info NOT in par_visit: "
+        f"{sorted(orphans)[:10]}"
+    )
+    excluded_in = batch_rc & exc_rc
+    assert len(excluded_in) == 0, (
+        f"{len(excluded_in)} excluded subject(s) found in batch.info: "
+        f"{sorted(excluded_in)[:10]}"
     )
 
 

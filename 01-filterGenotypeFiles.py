@@ -91,7 +91,9 @@ def main():
     )
 
     combined["_valid"] = combined["release_candid"].isin(valid_release_candids)
-    valid = combined[combined["_valid"]]
+    # require valid subjects to also have batch metadata so the output
+    # .fam and batch.info contain exactly the same subjects
+    valid = combined[combined["_valid"]].dropna(subset=["visit", "plate_number"])
 
     # -- write keep_list.txt for plink2 --keep --
     valid[["new_FID", "new_IID"]].to_csv(
@@ -101,8 +103,10 @@ def main():
         header=False,
     )
 
-    # -- write batch.info (only valid subjects) --
-    valid[["new_IID", "visit", "plate_number"]].to_csv(
+    # -- write batch.info (same subjects as keep_list / hbcd.fam) --
+    valid[["new_IID", "visit", "plate_number"]].rename(
+        columns={"new_IID": "IID"}
+    ).to_csv(
         release_dir / "batch.info",
         sep="\t",
         index=False,
