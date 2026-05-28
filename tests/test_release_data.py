@@ -24,6 +24,7 @@ def _load_data():
         names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
     )
     batch = pd.read_csv(RELEASE_DIR / "batch.info", sep="\t")
+    batch = batch.rename(columns={batch.columns[0]: "IID"})
     excluded = pd.read_csv(
         RELEASE_DIR.parent / "Removed_individuals.txt",
         delim_whitespace=True,
