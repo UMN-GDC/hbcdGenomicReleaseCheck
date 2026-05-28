@@ -106,6 +106,8 @@ def main():
     valid = combined[combined["_valid"]].dropna(subset=["visit", "plate_number"])
     # keep the original .fam row order so batch.info matches hbcd.fam exactly
     valid = valid.sort_values("_idx")
+    # safety net: one row per IID (catches any remaining merge artefacts)
+    valid = valid.drop_duplicates(subset="new_IID")
 
     # -- write keep_list.txt for plink2 --keep --
     valid[["new_FID", "new_IID"]].to_csv(
