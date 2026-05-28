@@ -54,7 +54,7 @@ def main():
     # -- merge to get de-identified IDs --
     combined = fam.merge(identifiers, how="left", on="pscid")
     combined = combined.merge(
-        batch, how="left", on=["release_candid", "relationship"]
+        batch, how="left", on=["release_candid"]
     )
 
     # -- de-identified FID / IID for ALL subjects --
@@ -81,7 +81,7 @@ def main():
     valid_release_candids = (
         set(
             int(v)
-            for v in identifiers[identifiers["candid"].isin(par_candids)][
+            for v in identifiers[identifiers["release_candid"].isin(par_candids)][
                 "release_candid"
             ]
             .dropna()
