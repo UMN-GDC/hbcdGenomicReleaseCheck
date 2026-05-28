@@ -21,7 +21,7 @@ def load_par_visit_candids(path=None):
         path = DATA_DIR / PAR_VISIT_FILE
     pv = pd.read_csv(path, sep="\t").query("par_visit_data_visit_missed == 'No'")
     ids = pv["participant_id"].dropna().apply(lambda v: int(str(v)[4:])).unique()
-    return set(ids)
+    return set(int(x) for x in ids)
 
 
 def load_identifiers(path=None):
@@ -49,7 +49,7 @@ def load_excluded_release_candids(path=None):
     )
     exc["release_candid"] = pd.to_numeric(exc["release_candid"])
     exc = exc.dropna(subset=["release_candid"])
-    return set(exc["release_candid"].astype(int).unique())
+    return set(int(x) for x in exc["release_candid"].unique())
 
 
 def load_excluded_with_relationship(path=None):
