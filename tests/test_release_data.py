@@ -66,6 +66,7 @@ def _id_lengths(iid_test):
 # ── formatting tests ──────────────────────────────────────────────────────
 
 def test_fam_and_batch_order_matches():
+    """batch.info IIDs are identical to hbcd.fam IIDs in both set and order."""
     fam, batch, _ = _load_data()
     assert (fam["IID"] == batch["IID"]).mean() == 1.0
     assert set(fam["IID"]) == set(batch["IID"]), "fam / batch IID sets differ"

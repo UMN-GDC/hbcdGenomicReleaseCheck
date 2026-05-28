@@ -94,6 +94,8 @@ def main():
     # require valid subjects to also have batch metadata so the output
     # .fam and batch.info contain exactly the same subjects
     valid = combined[combined["_valid"]].dropna(subset=["visit", "plate_number"])
+    # keep the original .fam row order so batch.info matches hbcd.fam exactly
+    valid = valid.sort_values("_idx")
 
     # -- write keep_list.txt for plink2 --keep --
     valid[["new_FID", "new_IID"]].to_csv(
