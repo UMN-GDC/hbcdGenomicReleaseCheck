@@ -9,16 +9,16 @@ dataPrefix=/projects/standard/basu_hbcd/shared/archive/HBCD_genomics_release_br_
 release=br_21p2
 releaseDir=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_${release}/data
 
-awk '{print $2}' ${dataPrefix}.bim | ${releaseDir}/../Extracted_variants.txt
+awk '{print $2}' ${dataPrefix}.bim > ${releaseDir}/../Extracted_variants.txt
 
 plink2 \
     --bfile $dataPrefix \
     --allow-extra-chr \
     --set-all-var-ids chr@_#_\$r_\$a_b38 \
     --extract ${dataDIR}/Extracted_variants.txt\
+    --fam "${releaseDir}/../temp.fam" \
     --make-bed --out "${releaseDir}/hbcd" \
     --remove "${releaseDir}/../Removed_individuals.txt"
-    #--fam "${releaseDir}/../temp.fam" \
 
 cd "${releaseDir}" || exit
 rm -f *.log
