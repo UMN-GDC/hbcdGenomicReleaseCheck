@@ -43,11 +43,8 @@ hbcd_fam = pd.read_csv(
     header=None,
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
-hbcd_fam["pscid"] = (
-    hbcd_fam["FID"].astype(str)
-    .str.rsplit("_", n=1).str[-1]
-    .str[:-1]                # drop trailing relationship letter
-)
+hbcd_fam["pscid"] = hbcd_fam["IID"].astype(str).str[-10:-1]
+hbcd_fam["_rel"] = hbcd_fam["IID"].astype(str).str[-1]
 
 # ── deduplicate + build key sets ───────────────────────────────────────────
 identifiers = identifiers.drop_duplicates(subset="release_candid")
