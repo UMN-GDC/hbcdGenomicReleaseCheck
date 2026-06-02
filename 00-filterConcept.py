@@ -43,12 +43,20 @@ hst_fam = pd.read_csv(
     header=None,
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
+hst_fam["pscid"] = hst_fam["FID"].astype(str).str.rsplit("_", n=1).str[-1]
 
 # ── deduplicate + build key sets ───────────────────────────────────────────
 identifiers = identifiers.drop_duplicates(subset="release_candid")
 
+# Map HST .fam subjects to release_candid via pscid
+hst_with_rc = hst_fam.merge(
+    identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
+    on="pscid",
+    how="left",
+)
+
 id_rc = set(identifiers["release_candid"].unique())
-hst_rc = set(hst_fam["FID"].dropna().unique()) - {0}
+hst_rc = set(hst_with_rc["release_candid"].dropna().unique())
 
 # ── print counts ───────────────────────────────────────────────────────────
 print("═" * 60)
