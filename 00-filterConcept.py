@@ -37,14 +37,14 @@ identifiers = load_identifiers()
 par_candids = load_par_visit_candids()
 exc_rc = load_excluded_release_candids()
 
-hst_fam = pd.read_csv(
+hbcd_fam = pd.read_csv(
     str(DATA_DIR / ".." / "HST_HBCD_Transfer_July2025" / "HBCD_analysis" / "hbcd.fam"),
     sep=r"\s+",
     header=None,
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
-hst_fam["pscid"] = (
-    hst_fam["FID"].astype(str)
+hbcd_fam["pscid"] = (
+    hbcd_fam["FID"].astype(str)
     .str.rsplit("_", n=1).str[-1]
     .str[:-1]                # drop trailing relationship letter
 )
@@ -52,21 +52,21 @@ hst_fam["pscid"] = (
 # ── deduplicate + build key sets ───────────────────────────────────────────
 identifiers = identifiers.drop_duplicates(subset="release_candid")
 
-hst_with_rc = hst_fam.merge(
+hbcd_with_rc = hbcd_fam.merge(
     identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
     on="pscid",
     how="left",
 )
 
 id_rc = set(identifiers["release_candid"].unique())
-hst_rc = set(hst_with_rc["release_candid"].dropna().unique())
+hbcd_rc = set(hbcd_with_rc["release_candid"].dropna().unique())
 
 # ── print counts ───────────────────────────────────────────────────────────
 print("═" * 60)
 print("Set sizes (release_candid level)")
 print("═" * 60)
 print(f"  identifiers                           : {len(id_rc):>6}")
-print(f"  HST .fam (hbcd.fam, excl FID=0)       : {len(hst_rc):>6}")
+print(f"  HST .fam (hbcd.fam, excl FID=0)       : {len(hbcd_rc):>6}")
 print(f"  par_visit (completed visits)           : {len(par_candids):>6}")
 print(f"  excluded                               : {len(exc_rc):>6}")
 print()
@@ -74,36 +74,36 @@ print()
 print("═" * 60)
 print("Pairwise overlaps")
 print("═" * 60)
-print(f"  identifiers ∩ HST .fam                 : {len(id_rc & hst_rc):>6}")
+print(f"  identifiers ∩ HST .fam                 : {len(id_rc & hbcd_rc):>6}")
 print(f"  identifiers ∩ par_visit                : {len(id_rc & par_candids):>6}")
-print(f"  HST .fam ∩ par_visit                   : {len(hst_rc & par_candids):>6}")
+print(f"  HST .fam ∩ par_visit                   : {len(hbcd_rc & par_candids):>6}")
 print()
 
 print("═" * 60)
 print("Triple overlap & effects of exclusion")
 print("═" * 60)
-triple = id_rc & hst_rc & par_candids
+triple = id_rc & hbcd_rc & par_candids
 print(f"  identifiers ∩ HST .fam ∩ par_visit     : {len(triple):>6}")
 print(f"    minus excluded                       : {len(triple - exc_rc):>6}")
 print()
 
-id_not_hst = id_rc - hst_rc
-hst_not_id = hst_rc - id_rc
-print(f"  identifiers only (not in HST .fam)     : {len(id_not_hst):>6}")
-print(f"  HST .fam only (not in identifiers)     : {len(hst_not_id):>6}")
+id_not_hbcd = id_rc - hbcd_rc
+hbcd_not_id = hbcd_rc - id_rc
+print(f"  identifiers only (not in HST .fam)     : {len(id_not_hbcd):>6}")
+print(f"  HST .fam only (not in identifiers)     : {len(hbcd_not_id):>6}")
 
 # ── Venn diagram ───────────────────────────────────────────────────────────
 if HAS_VENN:
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
 
     subsets = (
-        len(id_rc - hst_rc - par_candids),
-        len(hst_rc - id_rc - par_candids),
-        len((id_rc & hst_rc) - par_candids),
-        len(par_candids - id_rc - hst_rc),
-        len((id_rc & par_candids) - hst_rc),
-        len((hst_rc & par_candids) - id_rc),
-        len(id_rc & hst_rc & par_candids),
+        len(id_rc - hbcd_rc - par_candids),
+        len(hbcd_rc - id_rc - par_candids),
+        len((id_rc & hbcd_rc) - par_candids),
+        len(par_candids - id_rc - hbcd_rc),
+        len((id_rc & par_candids) - hbcd_rc),
+        len((hbcd_rc & par_candids) - id_rc),
+        len(id_rc & hbcd_rc & par_candids),
     )
 
     colors = ["#1f78b4", "#e31a1c", "#33a02c"]
@@ -143,9 +143,9 @@ else:
     print("Set sizes (release_candid level)")
     print("═" * 60)
     print(f"  identifiers           = {len(id_rc)}")
-    print(f"  HST .fam              = {len(hst_rc)}")
+    print(f"  HST .fam              = {len(hbcd_rc)}")
     print(f"  par_visit             = {len(par_candids)}")
     print(f"  excluded              = {len(exc_rc)}")
-    print(f"  identifiers ∩ HST     = {len(id_rc & hst_rc)}")
-    print(f"  (∩) ∩ par_visit      = {len(id_rc & hst_rc & par_candids)}")
-    print(f"  valid (final)         = {len((id_rc & hst_rc & par_candids) - exc_rc)}")
+    print(f"  identifiers ∩ HST     = {len(id_rc & hbcd_rc)}")
+    print(f"  (∩) ∩ par_visit      = {len(id_rc & hbcd_rc & par_candids)}")
+    print(f"  valid (final)         = {len((id_rc & hbcd_rc & par_candids) - exc_rc)}")
