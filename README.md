@@ -28,6 +28,14 @@ exclusion list.  Performs:
    - `batch.info` — tab-delimited with columns IID, visit, plate_number.
    - `Removed_individuals.txt` — excluded subjects (documentation).
 
+### 0. Exploration & overlap Venn (`00-filterConcept.py`)
+
+Loads identifiers, par_visit, and the HST .fam, then plots the
+`release_candid` overlap across the three sources, annotated with
+exclusion counts.  Requires `matplotlib-venn`.
+
+![filter_overlap_venn.png](filter_overlap_venn.png)
+
 ### 2. PLINK2 filter (`02-run_plink_filter.sh`)
 
 ```bash

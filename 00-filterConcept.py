@@ -43,12 +43,19 @@ hst_fam = pd.read_csv(
     header=None,
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
-hst_fam["pscid"] = hst_fam["FID"].astype(str).str.rsplit("_", n=1).str[-1]
+hst_fam["pscid"] = (
+    hst_fam["FID"].astype(str)
+    .str.rsplit("_", n=1).str[-1]
+    .str[:-1]                # drop trailing relationship letter
+    .pipe(pd.to_numeric, errors="coerce")
+)
 
 # ── deduplicate + build key sets ───────────────────────────────────────────
 identifiers = identifiers.drop_duplicates(subset="release_candid")
 
-# Map HST .fam subjects to release_candid via pscid
+# Enforce integer pscid for joining
+identifiers["pscid"] = pd.to_numeric(identifiers["pscid"], errors="coerce")
+
 hst_with_rc = hst_fam.merge(
     identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
     on="pscid",
