@@ -38,7 +38,7 @@ par_candids = load_par_visit_candids()
 exc_rc = load_excluded_release_candids()
 
 hst_fam = pd.read_csv(
-    str(DATA_DIR / "HST_HBCD_Transfer_July2025" / "HBCD_analysis" / "hbcd.fam"),
+    str(DATA_DIR / ".." / "HST_HBCD_Transfer_July2025" / "HBCD_analysis" / "hbcd.fam"),
     sep=r"\s+",
     header=None,
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
