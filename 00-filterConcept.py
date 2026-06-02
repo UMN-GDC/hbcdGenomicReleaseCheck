@@ -111,11 +111,23 @@ if HAS_VENN:
         len(id_rc & batch_rc & par_candids),
     )
 
-    v = venn3(subsets, set_labels=("identifiers", "batch.info", "par_visit"), ax=ax1)
+    colors = ["#1f78b4", "#e31a1c", "#33a02c"]
+    v = venn3(subsets, set_labels=("identifiers", "batch.info", "par_visit"),
+              set_colors=colors, ax=ax1)
     ax1.set_title("release_candid overlap", fontsize=12)
 
-    v2 = venn3(subsets, set_labels=("identifiers", "batch.info", "par_visit"), ax=ax2)
+    v2 = venn3(subsets, set_labels=("identifiers", "batch.info", "par_visit"),
+               set_colors=colors, ax=ax2)
     ax2.set_title("with excluded highlighted", fontsize=12)
+
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor=colors[0], alpha=0.5, label="identifiers"),
+        Patch(facecolor=colors[1], alpha=0.5, label="batch.info"),
+        Patch(facecolor=colors[2], alpha=0.5, label="par_visit"),
+    ]
+    ax1.legend(handles=legend_elements, loc="lower left", fontsize=9)
+    ax2.legend(handles=legend_elements, loc="lower left", fontsize=9)
 
     triple_rc = id_rc & batch_rc & par_candids
     valid_final = triple_rc - exc_rc
