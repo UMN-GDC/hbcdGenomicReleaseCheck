@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
-"""Explore overlap between data sources and filters using Venn diagrams.
+"""Explore overlap between data sources using Venn diagrams.
 
-Reuses the same merge + filter logic as 01-filterGenotypeFiles.py but
-visualises how many release_candids / pscids survive each stage.
+Compares release_candids across:
+  - identifiers (release_identifiers CSV)
+  - par_visit (completed visit data)
+  - HST .fam (de-identified PLINK file from HST_HBCD_Transfer)
 """
 
 import pandas as pd
@@ -15,7 +17,6 @@ from _lib import (
     load_par_visit_candids,
     load_identifiers,
     load_excluded_release_candids,
-    load_excluded_with_relationship,
 )
 
 try:
@@ -33,105 +34,87 @@ except ImportError:
 
 # ── data sources ──────────────────────────────────────────────────────────
 identifiers = load_identifiers()
-batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
-batch["release_candid"] = pd.to_numeric(batch["IID"].str[:-1])
-fam = pd.read_csv(
-    str(DATA_DIR / "HBCD.fam"),
+par_candids = load_par_visit_candids()
+exc_rc = load_excluded_release_candids()
+
+hst_fam = pd.read_csv(
+    str(DATA_DIR / "HST_HBCD_Transfer_July2025" / "HBCD_analysis" / "hbcd.fam"),
     sep=r"\s+",
     header=None,
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
-fam["pscid"] = fam["IID"].str[-10:-1]
 
-par_candids = load_par_visit_candids()
-exc_rc = load_excluded_release_candids()
+# ── deduplicate + build key sets ───────────────────────────────────────────
+identifiers = identifiers.drop_duplicates(subset="release_candid")
 
-# ── build key sets (by release_candid) ─────────────────────────────────────
 id_rc = set(identifiers["release_candid"].unique())
-batch_rc = set(batch["release_candid"].dropna().unique())
-fam_pscid = set(fam["pscid"].unique())
-id_pscid = set(identifiers["pscid"].unique())
+hst_rc = set(hst_fam["FID"].dropna().unique()) - {0}
 
-fam_rc = set(
-    identifiers.loc[identifiers["pscid"].isin(fam_pscid), "release_candid"].unique()
-)
-
-# ── print stage-by-stage counts ────────────────────────────────────────────
+# ── print counts ───────────────────────────────────────────────────────────
 print("═" * 60)
-print("Filtering cascade (release_candid level)")
+print("Set sizes (release_candid level)")
 print("═" * 60)
-print(f"  identifiers (unique release_candids)   : {len(id_rc):>6}")
-print(f"  batch.info (unique release_candids)    : {len(batch_rc):>6}")
+print(f"  identifiers                           : {len(id_rc):>6}")
+print(f"  HST .fam (hbcd.fam, excl FID=0)       : {len(hst_rc):>6}")
 print(f"  par_visit (completed visits)           : {len(par_candids):>6}")
 print(f"  excluded                               : {len(exc_rc):>6}")
 print()
 
-id_and_batch = id_rc & batch_rc
-id_only = id_rc - batch_rc
-batch_only = batch_rc - id_rc
-print(f"  identifiers + batch overlap            : {len(id_and_batch):>6}")
-print(f"  identifiers only                       : {len(id_only):>6}")
-print(f"  batch only                             : {len(batch_only):>6}")
-print()
-
-in_par = id_and_batch & par_candids
-not_par = id_and_batch - par_candids
-print(f"  overlapping + in par_visit             : {len(in_par):>6}")
-print(f"  overlapping but NOT in par_visit        : {len(not_par):>6}")
-print()
-
-valid_rc = in_par - exc_rc
-excluded_in_valid = in_par & exc_rc
-print(f"  valid (par_visit - excluded)            : {len(valid_rc):>6}")
-print(f"  excluded from overlapping + par_visit   : {len(excluded_in_valid):>6}")
-print()
-
-# ── pscid overlap (fam) ────────────────────────────────────────────────────
 print("═" * 60)
-print("pscid-level overlap (fam × identifiers)")
+print("Pairwise overlaps")
 print("═" * 60)
-print(f"  fam (unique pscids)                    : {len(fam_pscid):>6}")
-print(f"  identifiers (unique pscids)            : {len(id_pscid):>6}")
-print(f"  fam ∩ identifiers                      : {len(fam_pscid & id_pscid):>6}")
-print(f"  fam only                               : {len(fam_pscid - id_pscid):>6}")
-print(f"  identifiers only                       : {len(id_pscid - fam_pscid):>6}")
+print(f"  identifiers ∩ HST .fam                 : {len(id_rc & hst_rc):>6}")
+print(f"  identifiers ∩ par_visit                : {len(id_rc & par_candids):>6}")
+print(f"  HST .fam ∩ par_visit                   : {len(hst_rc & par_candids):>6}")
 print()
 
-# ── Venn diagram (release_candid) ──────────────────────────────────────────
+print("═" * 60)
+print("Triple overlap & effects of exclusion")
+print("═" * 60)
+triple = id_rc & hst_rc & par_candids
+print(f"  identifiers ∩ HST .fam ∩ par_visit     : {len(triple):>6}")
+print(f"    minus excluded                       : {len(triple - exc_rc):>6}")
+print()
+
+id_not_hst = id_rc - hst_rc
+hst_not_id = hst_rc - id_rc
+print(f"  identifiers only (not in HST .fam)     : {len(id_not_hst):>6}")
+print(f"  HST .fam only (not in identifiers)     : {len(hst_not_id):>6}")
+
+# ── Venn diagram ───────────────────────────────────────────────────────────
 if HAS_VENN:
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
 
     subsets = (
-        len(id_rc - batch_rc - par_candids),
-        len(batch_rc - id_rc - par_candids),
-        len((id_rc & batch_rc) - par_candids),
-        len(par_candids - id_rc - batch_rc),
-        len((id_rc & par_candids) - batch_rc),
-        len((batch_rc & par_candids) - id_rc),
-        len(id_rc & batch_rc & par_candids),
+        len(id_rc - hst_rc - par_candids),
+        len(hst_rc - id_rc - par_candids),
+        len((id_rc & hst_rc) - par_candids),
+        len(par_candids - id_rc - hst_rc),
+        len((id_rc & par_candids) - hst_rc),
+        len((hst_rc & par_candids) - id_rc),
+        len(id_rc & hst_rc & par_candids),
     )
 
     colors = ["#1f78b4", "#e31a1c", "#33a02c"]
-    v = venn3(subsets, set_labels=("identifiers", "batch.info", "par_visit"),
+
+    v = venn3(subsets, set_labels=("identifiers", "HST .fam", "par_visit"),
               set_colors=colors, ax=ax1)
     ax1.set_title("release_candid overlap", fontsize=12)
 
-    v2 = venn3(subsets, set_labels=("identifiers", "batch.info", "par_visit"),
+    v2 = venn3(subsets, set_labels=("identifiers", "HST .fam", "par_visit"),
                set_colors=colors, ax=ax2)
     ax2.set_title("with excluded highlighted", fontsize=12)
 
     from matplotlib.patches import Patch
     legend_elements = [
         Patch(facecolor=colors[0], alpha=0.5, label="identifiers"),
-        Patch(facecolor=colors[1], alpha=0.5, label="batch.info"),
+        Patch(facecolor=colors[1], alpha=0.5, label="HST .fam"),
         Patch(facecolor=colors[2], alpha=0.5, label="par_visit"),
     ]
     ax1.legend(handles=legend_elements, loc="lower left", fontsize=9)
     ax2.legend(handles=legend_elements, loc="lower left", fontsize=9)
 
-    triple_rc = id_rc & batch_rc & par_candids
-    valid_final = triple_rc - exc_rc
-
+    valid_final = triple - exc_rc
     ax2.text(
         -0.6, -0.7,
         f"Excluded: {len(exc_rc)}\nValid (final): {len(valid_final)}",
@@ -141,18 +124,17 @@ if HAS_VENN:
 
     out_path = HERE / "filter_overlap_venn.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    print(f"Venn diagram saved to {out_path}")
-    print()
+    print(f"\nVenn diagram saved to {out_path}")
     plt.show()
 
 else:
-    print("═" * 60)
+    print("\n═" * 60)
     print("Set sizes (release_candid level)")
     print("═" * 60)
     print(f"  identifiers           = {len(id_rc)}")
-    print(f"  batch.info            = {len(batch_rc)}")
+    print(f"  HST .fam              = {len(hst_rc)}")
     print(f"  par_visit             = {len(par_candids)}")
     print(f"  excluded              = {len(exc_rc)}")
-    print(f"  identifiers ∩ batch   = {len(id_rc & batch_rc)}")
-    print(f"  (∩) ∩ par_visit      = {len(id_rc & batch_rc & par_candids)}")
-    print(f"  valid (final)         = {len((id_rc & batch_rc & par_candids) - exc_rc)}")
+    print(f"  identifiers ∩ HST     = {len(id_rc & hst_rc)}")
+    print(f"  (∩) ∩ par_visit      = {len(id_rc & hst_rc & par_candids)}")
+    print(f"  valid (final)         = {len((id_rc & hst_rc & par_candids) - exc_rc)}")
