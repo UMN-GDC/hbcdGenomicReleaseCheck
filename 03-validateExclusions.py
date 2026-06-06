@@ -14,7 +14,7 @@ release_pscids = set(identifiers["pscid"].unique())
 print(f"Release pscids  : {len(release_pscids)}")
 
 # ── load exclusions (CSV: columns = exclusion reasons, values = pscids) ──
-raw = pd.read_csv(DATA_DIR / "HBCD_exclusions20250526.csv")
+raw = pd.read_csv(DATA_DIR / "HBCDexclusions.csv")
 excl_lists = {
     col: set(raw[col].dropna().astype(str).str.strip())
     for col in raw.columns
