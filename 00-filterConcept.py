@@ -55,6 +55,10 @@ hbcd_with_rc = hbcd_fam.merge(
     how="left",
 )
 
+hbcd_with_rc[hbcd_with_rc["release_candid"].isnull()]
+hbcd_with_rc.isnull().sum()
+
+
 id_rc = set(identifiers["release_candid"].unique())
 hbcd_rc = set(hbcd_with_rc["release_candid"].dropna().unique())
 
