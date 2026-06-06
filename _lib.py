@@ -69,7 +69,7 @@ def load_excluded_with_relationship(path=None):
     return exc.dropna(subset=["release_candid"])[["release_candid", "relationship"]]
 
 
-ADDITIONAL_EXCLUSIONS_FILE = "HBCD_exlcustions.xlsx"
+ADDITIONAL_EXCLUSIONS_FILE = "../data/HBCD_exclusions20250526.xlsx"
 
 
 def parse_additional_exclusion_lists(path=None):
