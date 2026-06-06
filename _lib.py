@@ -67,3 +67,52 @@ def load_excluded_with_relationship(path=None):
     exc["release_candid"] = pd.to_numeric(exc["release_candid"])
     exc["relationship"] = exc["Study_ID"].str[-1]
     return exc.dropna(subset=["release_candid"])[["release_candid", "relationship"]]
+
+
+ADDITIONAL_EXCLUSIONS_FILE = "HBCD_exlcustions.xlsx"
+
+
+def parse_additional_exclusion_lists(path=None):
+    """Read the first sheet of HBCD_exlcustions.xlsx, skip first 13 rows,
+    then parse stacked lists of pscids stacked in column A.
+
+    The column contains alternating patterns::
+
+        [empty lines]
+        Header text describing the list
+        pscid-1
+        pscid-2
+        ...
+        [empty lines]
+        Next header
+        pscid-a
+        ...
+
+    Returns a dict of ``{header: set_of_pscid_strings}``.
+    """
+    if path is None:
+        path = DATA_DIR / ADDITIONAL_EXCLUSIONS_FILE
+    raw = pd.read_excel(path, sheet_name=0, skiprows=13, header=None)
+    col = raw.iloc[:, 0].dropna().astype(str).str.strip()
+
+    lists = {}
+    current_header = None
+    current_items = []
+
+    for val in col:
+        if not val or val == "nan":
+            continue
+        is_pscid = val.isdigit() and len(val) <= 12
+        if is_pscid:
+            if current_header is not None:
+                current_items.append(val)
+        else:
+            if current_header is not None and current_items:
+                lists[current_header] = set(current_items)
+            current_header = val
+            current_items = []
+
+    if current_header is not None and current_items:
+        lists[current_header] = set(current_items)
+
+    return lists
