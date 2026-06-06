@@ -17,6 +17,7 @@ from _lib import (
     load_par_visit_candids,
     load_identifiers,
     load_excluded_release_candids,
+    load_additional_excluded_pscids,
 )
 
 try:
@@ -36,6 +37,7 @@ except ImportError:
 identifiers = load_identifiers()
 par_candids = load_par_visit_candids()
 exc_rc = load_excluded_release_candids()
+add_exc_pscids = load_additional_excluded_pscids()
 
 hbcd_fam = pd.read_csv(
     str(DATA_DIR / ".." / "HST_HBCD_Transfer_July2025" / "HBCD_analysis" / "hbcd.fam"),
@@ -69,7 +71,17 @@ print("═" * 60)
 print(f"  identifiers                           : {len(id_rc):>6}")
 print(f"  HST .fam (hbcd.fam, excl FID=0)       : {len(hbcd_rc):>6}")
 print(f"  par_visit (completed visits)           : {len(par_candids):>6}")
-print(f"  excluded                               : {len(exc_rc):>6}")
+print(f"  excluded (release_candid, Excel)       : {len(exc_rc):>6}")
+print(f"  excluded (pscid, HBCDexclusions.csv)   : {len(add_exc_pscids):>6})")
+
+# map additional excluded pscids to release_candids
+add_exc_rc = set(
+    identifiers.loc[identifiers["pscid"].isin(add_exc_pscids), "release_candid"]
+    .dropna()
+    .astype(int)
+    .unique()
+)
+print(f"  → mapped to release_candids            : {len(add_exc_rc):>6}")
 print()
 
 print("═" * 60)
@@ -84,8 +96,10 @@ print("═" * 60)
 print("Triple overlap & effects of exclusion")
 print("═" * 60)
 triple = id_rc & hbcd_rc & par_candids
+all_exc_rc = exc_rc | add_exc_rc
 print(f"  identifiers ∩ HST .fam ∩ par_visit     : {len(triple):>6}")
-print(f"    minus excluded                       : {len(triple - exc_rc):>6}")
+print(f"    minus Excel exclusions               : {len(triple - exc_rc):>6}")
+print(f"    minus CSV exclusions                 : {len(triple - all_exc_rc):>6}")
 print()
 
 id_not_hbcd = id_rc - hbcd_rc
@@ -126,10 +140,12 @@ if HAS_VENN:
     ax1.legend(handles=legend_elements, loc="lower left", fontsize=9)
     ax2.legend(handles=legend_elements, loc="lower left", fontsize=9)
 
-    valid_final = triple - exc_rc
+    valid_final = triple - all_exc_rc
     ax2.text(
         -0.6, -0.7,
-        f"Excluded: {len(exc_rc)}\nValid (final): {len(valid_final)}",
+        f"Excel excluded RC : {len(exc_rc)}\n"
+        f"CSV excluded RC  : {len(add_exc_rc)}\n"
+        f"Valid (final)    : {len(valid_final)}",
         fontsize=10,
         bbox=dict(facecolor="lightcoral", alpha=0.4),
     )
@@ -149,4 +165,6 @@ else:
     print(f"  excluded              = {len(exc_rc)}")
     print(f"  identifiers ∩ HST     = {len(id_rc & hbcd_rc)}")
     print(f"  (∩) ∩ par_visit      = {len(id_rc & hbcd_rc & par_candids)}")
-    print(f"  valid (final)         = {len((id_rc & hbcd_rc & par_candids) - exc_rc)}")
+    print(f"  + Excel exclusions   = {len(exc_rc)}")
+    print(f"  + CSV exclusions     = {len(add_exc_rc)}")
+    print(f"  valid (final)         = {len((id_rc & hbcd_rc & par_candids) - all_exc_rc)}")

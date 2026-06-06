@@ -18,6 +18,7 @@ from _lib import (
     load_identifiers,
     load_excluded_release_candids,
     load_excluded_with_relationship,
+    load_additional_excluded_pscids,
 )
 
 
@@ -65,6 +66,14 @@ def main():
     combined = combined[rel_ok]
     # Safety: one row per original .fam subject
     combined = combined.drop_duplicates(subset="_idx")
+
+    # -- remove subjects listed in HBCDexclusions.csv --
+    excluded_pscids = load_additional_excluded_pscids()
+    n_before = len(combined)
+    combined = combined[~combined["pscid"].isin(excluded_pscids)]
+    n_removed = n_before - len(combined)
+    if n_removed:
+        print(f"  Removed {n_removed} subject(s) via HBCDexclusions.csv")
 
     # -- de-identified FID / IID for ALL subjects --
     combined["new_FID"] = combined["release_candid"].fillna(0).astype(int)
