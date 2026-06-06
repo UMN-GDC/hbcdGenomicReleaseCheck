@@ -78,7 +78,12 @@ def main():
     # -- de-identified FID / IID for ALL subjects --
     combined["new_FID"] = combined["release_candid"].fillna(0).astype(int)
     combined["new_rel"] = combined["relationship"].fillna(combined["_orig_rel"])
+    # When FID=0 (no identifier mapping), suffix with pscid to keep IID unique
+    has_rc = combined["release_candid"].notna()
     combined["new_IID"] = combined["new_FID"].astype(str) + combined["new_rel"]
+    combined.loc[~has_rc, "new_IID"] = (
+        "0_" + combined.loc[~has_rc, "pscid"] + "_" + combined.loc[~has_rc, "_orig_rel"]
+    )
 
     # restore original .fam row order
     combined = combined.sort_values("_idx")
