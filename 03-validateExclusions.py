@@ -13,36 +13,12 @@ identifiers["pscid"] = identifiers["pscid"].astype(str).str.strip()
 release_pscids = set(identifiers["pscid"].unique())
 print(f"Release pscids  : {len(release_pscids)}")
 
-excel_file = pd.ExcelFile(DATA_DIR / "HBCD_exclusions20250526.xlsx")
-excel_file.sheet_names
-
-# ── load exclusions ──────────────────────────────────────────────────────
-raw = pd.read_excel(
-    DATA_DIR / "HBCD_exclusions20250526.xlsx",
-    sheet_name=0,
-    skiprows=13,
-    header=None,
-)
-col = raw.iloc[:, 0].dropna().astype(str).str.strip()
-
-excl_lists = {}
-header = None
-items = []
-
-for val in col:
-    if not val or val == "nan":
-        continue
-    if val.isdigit() and len(val) <= 12:
-        if header is not None:
-            items.append(val)
-    else:
-        if header is not None and items:
-            excl_lists[header] = set(items)
-        header = val
-        items = []
-
-if header is not None and items:
-    excl_lists[header] = set(items)
+# ── load exclusions (CSV: columns = exclusion reasons, values = pscids) ──
+raw = pd.read_csv(DATA_DIR / "HBCD_exclusions20250526.csv")
+excl_lists = {
+    col: set(raw[col].dropna().astype(str).str.strip())
+    for col in raw.columns
+}
 
 # ── check overlap ────────────────────────────────────────────────────────
 print(f"\n{len(excl_lists)} exclusion lists\n")
