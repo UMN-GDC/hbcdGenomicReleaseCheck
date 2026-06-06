@@ -1,18 +1,66 @@
 #!/usr/bin/env python3
 
-from _lib import load_identifiers, load_additional_excluded_pscids
+import pandas as pd
+from pathlib import Path
+from _lib import DATA_DIR, load_additional_excluded_pscids
 
-identifiers = load_identifiers()
-identifiers["pscid"] = identifiers["pscid"].astype(str).str.strip()
-release_pscids = set(identifiers["pscid"].unique())
-print(f"Release pscids  : {len(release_pscids)}")
+RELEASE_DIR = Path(
+    "/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data/"
+)
 
+# -- load excluded pscids and map to release_candids --
 excluded = load_additional_excluded_pscids()
-print(f"Excluded pscids : {len(excluded)}")
+print(f"Excluded pscids  : {len(excluded)}")
 
-overlap = release_pscids & excluded
-print(f"Overlap         : {len(overlap)}")
+identifiers = pd.read_csv(DATA_DIR / "release_identifiers_20260526.csv")
+identifiers = identifiers[identifiers["release_candid"] != "release_candid"]
+identifiers["release_candid"] = pd.to_numeric(identifiers["release_candid"])
+identifiers = identifiers.dropna(subset=["release_candid"])
+identifiers["pscid"] = identifiers["pscid"].astype(str).str.strip()
+
+exc_rc = set(
+    identifiers.loc[identifiers["pscid"].isin(excluded), "release_candid"]
+    .dropna()
+    .astype(int)
+    .unique()
+)
+print(f"Mapped to RC     : {len(exc_rc)}")
+print()
+
+# -- check output hbcd.fam --
+hbcd = pd.read_csv(
+    RELEASE_DIR / "hbcd.fam",
+    sep=r"\s+",
+    header=None,
+    names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
+)
+fam_rc = set(hbcd.loc[hbcd["FID"] != 0, "FID"].dropna().unique())
+
+overlap = exc_rc & fam_rc
+status = "OK" if not overlap else "OVERLAP"
+print(f"  [{status:>7}] hbcd.fam")
+print(f"           unique RC in fam  : {len(fam_rc):>6}")
+print(f"           excluded RC in fam: {len(overlap):>6}")
 if overlap:
-    print(f"Overlapping     : {sorted(overlap)[:20]}")
-else:
-    print("All clean — zero overlap")
+    print(f"           overlapping RC    : {sorted(overlap)[:20]}")
+print()
+
+# -- break down by exclusion reason --
+raw = pd.read_csv(DATA_DIR / "HBCDexclusions.csv")
+for col in raw.columns:
+    pscids = set(raw[col].dropna().astype(str).str.strip())
+    pscids = {p for p in pscids if p and p != "nan"}
+    col_rc = set(
+        identifiers.loc[identifiers["pscid"].isin(pscids), "release_candid"]
+        .dropna()
+        .astype(int)
+        .unique()
+    )
+    in_fam = col_rc & fam_rc
+    s = "OK" if not in_fam else "OVERLAP"
+    print(f"  [{s:>7}] {col}")
+    print(f"           list size    : {len(pscids):>6}")
+    print(f"           in hbcd.fam  : {len(in_fam):>6}")
+    if in_fam:
+        print(f"           overlapping RC: {sorted(in_fam)[:15]}")
+    print()
