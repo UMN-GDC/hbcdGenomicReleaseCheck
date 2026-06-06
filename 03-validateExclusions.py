@@ -13,6 +13,9 @@ identifiers["pscid"] = identifiers["pscid"].astype(str).str.strip()
 release_pscids = set(identifiers["pscid"].unique())
 print(f"Release pscids  : {len(release_pscids)}")
 
+excel_file = pd.ExcelFile(DATA_DIR / "HBCD_exclusions20250526.xlsx")
+excel_file.sheet_names
+
 # ── load exclusions ──────────────────────────────────────────────────────
 raw = pd.read_excel(
     DATA_DIR / "HBCD_exclusions20250526.xlsx",
