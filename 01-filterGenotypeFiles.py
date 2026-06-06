@@ -32,6 +32,14 @@ def main():
 
     # -- identifiers --
     identifiers = load_identifiers()
+    # Strip out subjects listed in HBCDexclusions.csv so they get no
+    # release_candid mapping → FID=0 in temp.fam + excluded from valid set
+    excluded_pscids = load_additional_excluded_pscids()
+    n_exc = identifiers["pscid"].isin(excluded_pscids).sum()
+    if n_exc:
+        print(f"  Excluding {n_exc} subject(s) from identifiers via "
+              f"HBCDexclusions.csv")
+        identifiers = identifiers[~identifiers["pscid"].isin(excluded_pscids)]
 
     # -- batch info --
     batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
@@ -66,14 +74,6 @@ def main():
     combined = combined[rel_ok]
     # Safety: one row per original .fam subject
     combined = combined.drop_duplicates(subset="_idx")
-
-    # -- remove subjects listed in HBCDexclusions.csv --
-    excluded_pscids = load_additional_excluded_pscids()
-    n_before = len(combined)
-    combined = combined[~combined["pscid"].isin(excluded_pscids)]
-    n_removed = n_before - len(combined)
-    if n_removed:
-        print(f"  Removed {n_removed} subject(s) via HBCDexclusions.csv")
 
     # -- de-identified FID / IID for ALL subjects --
     combined["new_FID"] = combined["release_candid"].fillna(0).astype(int)
