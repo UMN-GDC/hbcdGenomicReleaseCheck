@@ -18,7 +18,6 @@ print(f"Release pscids (from identifiers)  : {len(release_pscids)}")
 
 path = DATA_DIR / ADDITIONAL_EXCLUSIONS_FILE
 print(f"Loading exclusion lists from       : {path}")
-print()
 
 excl_lists = parse_additional_exclusion_lists(path)
 print(f"Found {len(excl_lists)} exclusion lists\n")
