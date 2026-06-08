@@ -301,3 +301,13 @@ if HAS_VENN:
 else:
     print("matplotlib-venn not available")
 ```
+
+
+```{python}
+#| label: qc-removal
+#| fig-cap: subjects removed by genomcis QC
+
+qced = pd.read_csv("../data/Removed_individuals.txt")
+qcRemoved = set(qced.loc[~qced.NA1.str.contains("^NA"), "NA1"])
+```
+
