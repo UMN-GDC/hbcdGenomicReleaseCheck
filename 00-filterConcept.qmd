@@ -40,11 +40,23 @@ hbcd_fam_raw = pd.read_csv(
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
 
+# ── parse hbcd.fam → join with identifiers on pscid ──────────────────────
+# IID = something_second_PSCIDC → split on _, 3rd part = pscid + rel
+hbcd_fam_raw["iid_part"] = hbcd_fam_raw["IID"].astype(str).str.split("_").str[2]
+hbcd_fam_raw["pscid"] = hbcd_fam_raw["iid_part"].str[:-1]
+hbcd_fam_raw["rel"] = hbcd_fam_raw["iid_part"].str[-1]
+
 identifiers = identifiers.drop_duplicates(subset="release_candid")
+
+hbcd = hbcd_fam_raw.merge(
+    identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
+    on="pscid",
+    how="left",
+).copy()
 
 # ── RC-level sets ───────────────────────────────────────────────────────
 id_rc = set(identifiers["release_candid"].unique())
-fam_rc = set(hbcd_fam_raw.loc[hbcd_fam_raw["FID"] != 0, "FID"].dropna().unique())
+fam_rc = set(hbcd.loc[hbcd["FID"] != 0, "release_candid"].dropna().unique())
 
 add_exc_rc = set(
     identifiers.loc[identifiers["pscid"].isin(add_exc_pscids), "release_candid"]
@@ -55,8 +67,12 @@ add_exc_rc = set(
 all_exc_rc = exc_rc | add_exc_rc
 
 # ── IID-level sets ─────────────────────────────────────────────────────
-# hbcd.fam IIDs (FID != 0)
-hbcd_iids = set(hbcd_fam_raw.loc[hbcd_fam_raw["FID"] != 0, "IID"].astype(str).str.split("_").str[2])
+# hbcd.fam IIDs: release_candid + rel (FID != 0)
+keep = hbcd["FID"] != 0
+hbcd_iids = set(
+    hbcd.loc[keep, "release_candid"].astype(int).astype(str)
+    + hbcd.loc[keep, "rel"]
+)
 
 # identifiers IIDs: each RC exists as both C and M
 id_iids = {f"{int(rc)}C" for rc in id_rc} | {f"{int(rc)}M" for rc in id_rc}
