@@ -56,7 +56,7 @@ all_exc_rc = exc_rc | add_exc_rc
 
 # ── IID-level sets ─────────────────────────────────────────────────────
 # hbcd.fam IIDs (FID != 0)
-hbcd_iids = set(hbcd_fam_raw.loc[hbcd_fam_raw["FID"] != 0, "IID"].astype(str))
+hbcd_iids = set(hbcd_fam_raw.loc[hbcd_fam_raw["FID"] != 0, "IID"].astype(str).str.split("_").str[2])
 
 # identifiers IIDs: each RC exists as both C and M
 id_iids = {f"{int(rc)}C" for rc in id_rc} | {f"{int(rc)}M" for rc in id_rc}
