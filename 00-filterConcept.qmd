@@ -40,10 +40,6 @@ hbcd_fam_raw = pd.read_csv(
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
 
-batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
-batch["rel"] = batch["IID"].str[-1]
-batch["rc"] = pd.to_numeric(batch["IID"].str[:-1])
-
 identifiers = identifiers.drop_duplicates(subset="release_candid")
 
 # ── RC-level sets ───────────────────────────────────────────────────────
@@ -62,28 +58,18 @@ all_exc_rc = exc_rc | add_exc_rc
 # hbcd.fam IIDs (FID != 0)
 hbcd_iids = set(hbcd_fam_raw.loc[hbcd_fam_raw["FID"] != 0, "IID"].astype(str))
 
-# identifiers IIDs: join release_candid with batch relationships
-id_iids = set()
-rc_batch_map = batch.groupby("rc")["rel"].apply(set).to_dict()
-for rc in id_rc:
-    rels = rc_batch_map.get(rc, set())
-    for rel in rels:
-        id_iids.add(f"{int(rc)}{rel}")
+# identifiers IIDs: each RC exists as both C and M
+id_iids = {f"{int(rc)}C" for rc in id_rc} | {f"{int(rc)}M" for rc in id_rc}
 
-# exclusion IIDs (via RC → batch relationships)
+# exclusion IIDs (same RC → both C/M)
 def rc_set_to_iids(rc_set):
-    iids = set()
-    for rc in rc_set:
-        rels = rc_batch_map.get(rc, set())
-        for rel in rels:
-            iids.add(f"{int(rc)}{rel}")
-    return iids
+    return {f"{int(rc)}C" for rc in rc_set} | {f"{int(rc)}M" for rc in rc_set}
 
 exc_iids = rc_set_to_iids(exc_rc)
 add_exc_iids = rc_set_to_iids(add_exc_rc)
 all_exc_iids = exc_iids | add_exc_iids
 
-# par_visit IIDs: par_visit RC × batch relationships
+# par_visit IIDs: each RC exists as both C and M
 par_iids = rc_set_to_iids(par_candids)
 
 # exclusion lists (individual) — keep at pscid level for Venn 2
