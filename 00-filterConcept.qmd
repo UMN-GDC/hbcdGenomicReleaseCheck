@@ -52,7 +52,7 @@ hbcd = hbcd_fam_raw.merge(
     identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
     on="pscid",
     how="left",
-).copy()
+).copy().dropna()
 
 # ── RC-level sets ───────────────────────────────────────────────────────
 id_rc = set(identifiers["release_candid"].unique())
