@@ -36,27 +36,54 @@ hbcd_fam_raw = pd.read_csv(
     header=None,
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
-hbcd_fam_raw["pscid"] = hbcd_fam_raw["IID"].astype(str).str[-10:-1]
 
-# ── deduplicate ─────────────────────────────────────────────────────────
+batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
+batch["rel"] = batch["IID"].str[-1]
+batch["rc"] = pd.to_numeric(batch["IID"].str[:-1])
+
 identifiers = identifiers.drop_duplicates(subset="release_candid")
 
-hbcd_with_rc = hbcd_fam_raw.merge(
-    identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
-    on="pscid",
-    how="left",
-)
-
+# ── RC-level sets ───────────────────────────────────────────────────────
 id_rc = set(identifiers["release_candid"].unique())
-hbcd_rc = set(hbcd_with_rc["release_candid"].dropna().unique())
+fam_rc = set(hbcd_fam_raw.loc[hbcd_fam_raw["FID"] != 0, "FID"].dropna().unique())
+
 add_exc_rc = set(
     identifiers.loc[identifiers["pscid"].isin(add_exc_pscids), "release_candid"]
     .dropna()
     .astype(int)
     .unique()
 )
+all_exc_rc = exc_rc | add_exc_rc
 
-# exclusion lists (individual)
+# ── IID-level sets ─────────────────────────────────────────────────────
+# hbcd.fam IIDs (FID != 0)
+hbcd_iids = set(hbcd_fam_raw.loc[hbcd_fam_raw["FID"] != 0, "IID"].astype(str))
+
+# identifiers IIDs: join release_candid with batch relationships
+id_iids = set()
+rc_batch_map = batch.groupby("rc")["rel"].apply(set).to_dict()
+for rc in id_rc:
+    rels = rc_batch_map.get(rc, set())
+    for rel in rels:
+        id_iids.add(f"{int(rc)}{rel}")
+
+# exclusion IIDs (via RC → batch relationships)
+def rc_set_to_iids(rc_set):
+    iids = set()
+    for rc in rc_set:
+        rels = rc_batch_map.get(rc, set())
+        for rel in rels:
+            iids.add(f"{int(rc)}{rel}")
+    return iids
+
+exc_iids = rc_set_to_iids(exc_rc)
+add_exc_iids = rc_set_to_iids(add_exc_rc)
+all_exc_iids = exc_iids | add_exc_iids
+
+# par_visit IIDs: par_visit RC × batch relationships
+par_iids = rc_set_to_iids(par_candids)
+
+# exclusion lists (individual) — keep at pscid level for Venn 2
 excl_csv = pd.read_csv(DATA_DIR / "HBCDexclusions.csv")
 excl_lists = {}
 for col in excl_csv.columns:
@@ -64,20 +91,20 @@ for col in excl_csv.columns:
     pscids = {p for p in pscids if p and p != "nan"}
     excl_lists[col] = pscids
 
-# map each list to release_candid
+# map each list to release_candid and IID
 excl_rc_lists = {}
+excl_iids_lists = {}
 for name, pscids in excl_lists.items():
-    excl_rc_lists[name] = set(
+    rc_set = set(
         identifiers.loc[identifiers["pscid"].isin(pscids), "release_candid"]
         .dropna()
         .astype(int)
         .unique()
     )
+    excl_rc_lists[name] = rc_set
+    excl_iids_lists[name] = rc_set_to_iids(rc_set)
 
-# combined exclusion RC
-all_exc_rc = exc_rc | add_exc_rc
-
-# pscid → candid mapping
+# pscid → candid mapping (for exclusion vs par_visit table)
 pscid_to_candid = (
     identifiers[["pscid", "candid"]]
     .dropna(subset=["candid"])
@@ -90,43 +117,47 @@ pscid_to_candid = (
 
 ```{python}
 #| label: cardinality-overview
-print("Set sizes (release_candid level)")
+print("Set sizes (IID level)")
 print("═" * 60)
-print(f"  identifiers                   : {len(id_rc):>6}")
-print(f"  hbcd.fam (HST, excl FID=0)    : {len(hbcd_rc):>6}")
-print(f"  par_visit (completed visits)   : {len(par_candids):>6}")
-print(f"  excluded (Excel, RC)           : {len(exc_rc):>6}")
-print(f"  excluded (HBCDexclusions.csv)  : {len(add_exc_pscids):>6} pscids")
-print(f"  → mapped to RC                 : {len(add_exc_rc):>6}")
-print(f"  combined exclusions            : {len(all_exc_rc):>6}")
+print(f"  identifiers (via batch rels)    : {len(id_iids):>6}")
+print(f"  hbcd.fam (FID != 0)             : {len(hbcd_iids):>6}")
+print(f"  par_visit (via batch rels)      : {len(par_iids):>6}")
+print(f"  excluded (Excel, IID)           : {len(exc_iids):>6}")
+print(f"  excluded (HBCDexclusions.csv)   : {len(add_exc_pscids):>6} pscids")
+print(f"  → mapped to IID                 : {len(add_exc_iids):>6}")
+print(f"  combined exclusions (IID)       : {len(all_exc_iids):>6}")
 print()
-print(f"  identifiers ∩ hbcd.fam         : {len(id_rc & hbcd_rc):>6}")
-print(f"  identifiers ∩ par_visit        : {len(id_rc & par_candids):>6}")
-print(f"  hbcd.fam ∩ par_visit           : {len(hbcd_rc & par_candids):>6}")
+
+print("IID-level pairwise overlaps")
+print("═" * 60)
+print(f"  identifiers ∩ hbcd.fam          : {len(id_iids & hbcd_iids):>6}")
+print(f"  identifiers ∩ par_visit         : {len(id_iids & par_iids):>6}")
+print(f"  hbcd.fam ∩ par_visit            : {len(hbcd_iids & par_iids):>6}")
 print()
-triple = id_rc & hbcd_rc & par_candids
-print(f"  identifiers ∩ hbcd.fam ∩ pv    : {len(triple):>6}")
-print(f"    minus all exclusions         : {len(triple - all_exc_rc):>6}")
+
+triple = id_iids & hbcd_iids & par_iids
+print(f"  identifiers ∩ hbcd.fam ∩ pv     : {len(triple):>6}")
+print(f"    minus all exclusions          : {len(triple - all_exc_iids):>6}")
 ```
 
 ---
 
 ## Venn 1: Identifiers vs hbcd.fam
 
-Overlap between identifiers (release_candid) and hbcd.fam (release_candid from FID).
+Overlap at the **IID level** (release_candid + C/M). This matches the true subject count in hbcd.fam (1752) rather than collapsing C/M.
 
 ```{python}
 #| label: venn-identifiers-vs-fam
-#| fig-cap: Release_candid overlap between identifiers and hbcd.fam
+#| fig-cap: IID-level overlap between identifiers and hbcd.fam
 if HAS_VENN:
     fig, ax = plt.subplots(figsize=(6, 6))
     v = venn2(
-        subsets=(len(id_rc - hbcd_rc), len(hbcd_rc - id_rc), len(id_rc & hbcd_rc)),
+        subsets=(len(id_iids - hbcd_iids), len(hbcd_iids - id_iids), len(id_iids & hbcd_iids)),
         set_labels=("identifiers", "hbcd.fam"),
         set_colors=["#1f78b4", "#e31a1c"],
         ax=ax,
     )
-    ax.set_title("Identifiers ∩ hbcd.fam (release_candid)", fontsize=13)
+    ax.set_title("Identifiers ∩ hbcd.fam (IID level)", fontsize=13)
     from matplotlib.patches import Patch
     ax.legend(
         handles=[
@@ -226,26 +257,26 @@ else:
 
 ## Venn 3: Combined Exclusions vs hbcd.fam vs par_visit
 
-All three exclusion lists are combined at the `release_candid` level and compared against hbcd.fam and par_visit.
+All three exclusion lists are combined at the **IID level** (release_candid + C/M), compared against hbcd.fam and par_visit (both also IID level).
 
 ```{python}
 #| label: venn-combined
-#| fig-cap: Combined exclusions vs hbcd.fam vs par_visit
+#| fig-cap: Combined exclusions vs hbcd.fam vs par_visit (IID level)
 if HAS_VENN:
     subsets = (
-        len(all_exc_rc - hbcd_rc - par_candids),
-        len(hbcd_rc - all_exc_rc - par_candids),
-        len((all_exc_rc & hbcd_rc) - par_candids),
-        len(par_candids - all_exc_rc - hbcd_rc),
-        len((all_exc_rc & par_candids) - hbcd_rc),
-        len((hbcd_rc & par_candids) - all_exc_rc),
-        len(all_exc_rc & hbcd_rc & par_candids),
+        len(all_exc_iids - hbcd_iids - par_iids),
+        len(hbcd_iids - all_exc_iids - par_iids),
+        len((all_exc_iids & hbcd_iids) - par_iids),
+        len(par_iids - all_exc_iids - hbcd_iids),
+        len((all_exc_iids & par_iids) - hbcd_iids),
+        len((hbcd_iids & par_iids) - all_exc_iids),
+        len(all_exc_iids & hbcd_iids & par_iids),
     )
 
     fig, ax = plt.subplots(figsize=(7, 7))
     v = venn3(
         subsets,
-        set_labels=("Excluded (RC)", "hbcd.fam", "par_visit"),
+        set_labels=("Excluded (IID)", "hbcd.fam", "par_visit"),
         set_colors=["#ff7f00", "#1f78b4", "#33a02c"],
         ax=ax,
     )
@@ -253,7 +284,7 @@ if HAS_VENN:
     from matplotlib.patches import Patch
     ax.legend(
         handles=[
-            Patch(facecolor="#ff7f00", alpha=0.5, label="Excluded (RC)"),
+            Patch(facecolor="#ff7f00", alpha=0.5, label="Excluded (IID)"),
             Patch(facecolor="#1f78b4", alpha=0.5, label="hbcd.fam"),
             Patch(facecolor="#33a02c", alpha=0.5, label="par_visit"),
         ],
