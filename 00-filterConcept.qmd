@@ -1,6 +1,9 @@
 ---
 title: "Genomic Release Filter Concept"
-format: html
+format:
+  html:
+    embed-resources: true
+    code-fold: true
 ---
 
 ```{python}
@@ -111,7 +114,7 @@ print(f"    minus all exclusions         : {len(triple - all_exc_rc):>6}")
 
 ---
 
-## Venn 1: Identifiers vs hbcd.fam
+## Identifiers vs hbcd.fam
 
 Overlap between identifiers (release_candid) and hbcd.fam (release_candid from FID).
 
@@ -175,7 +178,7 @@ for name, pscids in excl_lists.items():
 
 ---
 
-## Venn 2: Overlap Between the Three Exclusion Lists
+## Overlap Between the Three Exclusion Lists
 
 How many pscids are shared across the three exclusion criteria?
 
@@ -224,7 +227,7 @@ else:
 
 ---
 
-## Venn 3: Combined Exclusions vs hbcd.fam vs par_visit
+## Combined Exclusions vs hbcd.fam vs par_visit
 
 All three exclusion lists are combined at the `release_candid` level and compared against hbcd.fam and par_visit.
 
