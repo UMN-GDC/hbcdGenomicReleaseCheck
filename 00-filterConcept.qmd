@@ -1,0 +1,267 @@
+---
+title: "Genomic Release Filter Concept"
+format: html
+---
+
+```{python}
+#| label: setup
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+from _lib import (
+    DATA_DIR,
+    load_par_visit_candids,
+    load_identifiers,
+    load_excluded_release_candids,
+    load_additional_excluded_pscids,
+)
+
+try:
+    from matplotlib_venn import venn2, venn3
+    import matplotlib.pyplot as plt
+    HAS_VENN = True
+except ImportError:
+    HAS_VENN = False
+
+# ── data sources ────────────────────────────────────────────────────────
+identifiers = load_identifiers()
+par_candids = load_par_visit_candids()
+exc_rc = load_excluded_release_candids()
+add_exc_pscids = load_additional_excluded_pscids()
+
+hbcd_fam_raw = pd.read_csv(
+    str(DATA_DIR / ".." / "HST_HBCD_Transfer_July2025" / "HBCD_analysis" / "hbcd.fam"),
+    sep=r"\s+",
+    header=None,
+    names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
+)
+hbcd_fam_raw["pscid"] = hbcd_fam_raw["IID"].astype(str).str[-10:-1]
+
+# ── deduplicate ─────────────────────────────────────────────────────────
+identifiers = identifiers.drop_duplicates(subset="release_candid")
+
+hbcd_with_rc = hbcd_fam_raw.merge(
+    identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
+    on="pscid",
+    how="left",
+)
+
+id_rc = set(identifiers["release_candid"].unique())
+hbcd_rc = set(hbcd_with_rc["release_candid"].dropna().unique())
+add_exc_rc = set(
+    identifiers.loc[identifiers["pscid"].isin(add_exc_pscids), "release_candid"]
+    .dropna()
+    .astype(int)
+    .unique()
+)
+
+# exclusion lists (individual)
+excl_csv = pd.read_csv(DATA_DIR / "HBCDexclusions.csv")
+excl_lists = {}
+for col in excl_csv.columns:
+    pscids = set(excl_csv[col].dropna().astype(str).str.strip())
+    pscids = {p for p in pscids if p and p != "nan"}
+    excl_lists[col] = pscids
+
+# map each list to release_candid
+excl_rc_lists = {}
+for name, pscids in excl_lists.items():
+    excl_rc_lists[name] = set(
+        identifiers.loc[identifiers["pscid"].isin(pscids), "release_candid"]
+        .dropna()
+        .astype(int)
+        .unique()
+    )
+
+# combined exclusion RC
+all_exc_rc = exc_rc | add_exc_rc
+
+# pscid → candid mapping
+pscid_to_candid = (
+    identifiers[["pscid", "candid"]]
+    .dropna(subset=["candid"])
+    .drop_duplicates(subset="pscid")
+    .set_index("pscid")["candid"]
+    .astype(int)
+    .to_dict()
+)
+```
+
+```{python}
+#| label: cardinality-overview
+print("Set sizes (release_candid level)")
+print("═" * 60)
+print(f"  identifiers                   : {len(id_rc):>6}")
+print(f"  hbcd.fam (HST, excl FID=0)    : {len(hbcd_rc):>6}")
+print(f"  par_visit (completed visits)   : {len(par_candids):>6}")
+print(f"  excluded (Excel, RC)           : {len(exc_rc):>6}")
+print(f"  excluded (HBCDexclusions.csv)  : {len(add_exc_pscids):>6} pscids")
+print(f"  → mapped to RC                 : {len(add_exc_rc):>6}")
+print(f"  combined exclusions            : {len(all_exc_rc):>6}")
+print()
+print(f"  identifiers ∩ hbcd.fam         : {len(id_rc & hbcd_rc):>6}")
+print(f"  identifiers ∩ par_visit        : {len(id_rc & par_candids):>6}")
+print(f"  hbcd.fam ∩ par_visit           : {len(hbcd_rc & par_candids):>6}")
+print()
+triple = id_rc & hbcd_rc & par_candids
+print(f"  identifiers ∩ hbcd.fam ∩ pv    : {len(triple):>6}")
+print(f"    minus all exclusions         : {len(triple - all_exc_rc):>6}")
+```
+
+---
+
+## Venn 1: Identifiers vs hbcd.fam
+
+Overlap between identifiers (release_candid) and hbcd.fam (release_candid from FID).
+
+```{python}
+#| label: venn-identifiers-vs-fam
+#| fig-cap: Release_candid overlap between identifiers and hbcd.fam
+if HAS_VENN:
+    fig, ax = plt.subplots(figsize=(6, 6))
+    v = venn2(
+        subsets=(len(id_rc - hbcd_rc), len(hbcd_rc - id_rc), len(id_rc & hbcd_rc)),
+        set_labels=("identifiers", "hbcd.fam"),
+        set_colors=["#1f78b4", "#e31a1c"],
+        ax=ax,
+    )
+    ax.set_title("Identifiers ∩ hbcd.fam (release_candid)", fontsize=13)
+    from matplotlib.patches import Patch
+    ax.legend(
+        handles=[
+            Patch(facecolor="#1f78b4", alpha=0.5, label="identifiers"),
+            Patch(facecolor="#e31a1c", alpha=0.5, label="hbcd.fam"),
+        ],
+        loc="lower left",
+        fontsize=9,
+    )
+    plt.tight_layout()
+    plt.show()
+else:
+    print("matplotlib-venn not available")
+```
+
+---
+
+## Exclusion Lists vs par_visit
+
+Each exclusion list's pscids are mapped to `candid` via identifiers, then checked against par_visit. Zero overlap is expected.
+
+```{python}
+#| label: exclusion-parvisit-table
+print(f"par_visit candids  : {len(par_candids)}")
+print()
+print(f"Exclusion lists    : {len(excl_lists)}\n")
+
+for name, pscids in excl_lists.items():
+    mapped = {p: pscid_to_candid.get(p) for p in pscids}
+    mapped_candids = {c for c in mapped.values() if c is not None}
+    missing = {p for p, c in mapped.items() if c is None}
+    overlap = mapped_candids & par_candids
+    pct = len(overlap) / len(mapped_candids) * 100 if mapped_candids else 0
+
+    status = "OK" if not overlap else "OVERLAP"
+    print(f"  [{status:>7}] {name}")
+    print(f"           list pscids          : {len(pscids):>6}")
+    print(f"           mapped to candid     : {len(mapped_candids):>6}")
+    if missing:
+        print(f"           unmapped pscids      : {len(missing):>6}")
+    print(f"           in par_visit         : {len(overlap):>6}  ({pct:.0f}%)")
+    if overlap:
+        print(f"           overlapping candids  : {sorted(overlap)[:15]}")
+    print()
+```
+
+---
+
+## Venn 2: Overlap Between the Three Exclusion Lists
+
+How many pscids are shared across the three exclusion criteria?
+
+```{python}
+#| label: venn-exclusion-lists
+#| fig-cap: Pscid-level overlap between the three exclusion lists
+if HAS_VENN:
+    lists_names = list(excl_lists.keys())
+    s0 = excl_lists[lists_names[0]]
+    s1 = excl_lists[lists_names[1]]
+    s2 = excl_lists[lists_names[2]]
+
+    subsets = (
+        len(s0 - s1 - s2),
+        len(s1 - s0 - s2),
+        len((s0 & s1) - s2),
+        len(s2 - s0 - s1),
+        len((s0 & s2) - s1),
+        len((s1 & s2) - s0),
+        len(s0 & s1 & s2),
+    )
+
+    fig, ax = plt.subplots(figsize=(7, 7))
+    v = venn3(
+        subsets,
+        set_labels=[n.split(":")[0] for n in lists_names],
+        set_colors=["#1f78b4", "#e31a1c", "#33a02c"],
+        ax=ax,
+    )
+    ax.set_title("Exclusion list pscid overlap", fontsize=13)
+    from matplotlib.patches import Patch
+    ax.legend(
+        handles=[
+            Patch(facecolor="#1f78b4", alpha=0.5, label=lists_names[0]),
+            Patch(facecolor="#e31a1c", alpha=0.5, label=lists_names[1]),
+            Patch(facecolor="#33a02c", alpha=0.5, label=lists_names[2]),
+        ],
+        loc="lower left",
+        fontsize=8,
+    )
+    plt.tight_layout()
+    plt.show()
+else:
+    print("matplotlib-venn not available")
+```
+
+---
+
+## Venn 3: Combined Exclusions vs hbcd.fam vs par_visit
+
+All three exclusion lists are combined at the `release_candid` level and compared against hbcd.fam and par_visit.
+
+```{python}
+#| label: venn-combined
+#| fig-cap: Combined exclusions vs hbcd.fam vs par_visit
+if HAS_VENN:
+    subsets = (
+        len(all_exc_rc - hbcd_rc - par_candids),
+        len(hbcd_rc - all_exc_rc - par_candids),
+        len((all_exc_rc & hbcd_rc) - par_candids),
+        len(par_candids - all_exc_rc - hbcd_rc),
+        len((all_exc_rc & par_candids) - hbcd_rc),
+        len((hbcd_rc & par_candids) - all_exc_rc),
+        len(all_exc_rc & hbcd_rc & par_candids),
+    )
+
+    fig, ax = plt.subplots(figsize=(7, 7))
+    v = venn3(
+        subsets,
+        set_labels=("Excluded (RC)", "hbcd.fam", "par_visit"),
+        set_colors=["#ff7f00", "#1f78b4", "#33a02c"],
+        ax=ax,
+    )
+    ax.set_title("Combined exclusions ∩ hbcd.fam ∩ par_visit", fontsize=13)
+    from matplotlib.patches import Patch
+    ax.legend(
+        handles=[
+            Patch(facecolor="#ff7f00", alpha=0.5, label="Excluded (RC)"),
+            Patch(facecolor="#1f78b4", alpha=0.5, label="hbcd.fam"),
+            Patch(facecolor="#33a02c", alpha=0.5, label="par_visit"),
+        ],
+        loc="lower left",
+        fontsize=9,
+    )
+    plt.tight_layout()
+    plt.show()
+else:
+    print("matplotlib-venn not available")
+```
