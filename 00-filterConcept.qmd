@@ -154,28 +154,25 @@ Overlap at the **IID level** (release_candid + C/M). This matches the true subje
 ```{python}
 #| label: venn-identifiers-vs-fam
 #| fig-cap: IID-level overlap between identifiers and hbcd.fam
-if HAS_VENN:
-    fig, ax = plt.subplots(figsize=(6, 6))
-    v = venn2(
-        subsets=(len(id_iids - hbcd_iids), len(hbcd_iids - id_iids), len(id_iids & hbcd_iids)),
-        set_labels=("identifiers", "hbcd.fam"),
-        set_colors=["#1f78b4", "#e31a1c"],
-        ax=ax,
-    )
-    ax.set_title("Identifiers ∩ hbcd.fam (IID level)", fontsize=13)
-    from matplotlib.patches import Patch
-    ax.legend(
-        handles=[
-            Patch(facecolor="#1f78b4", alpha=0.5, label="identifiers"),
-            Patch(facecolor="#e31a1c", alpha=0.5, label="hbcd.fam"),
-        ],
-        loc="lower left",
-        fontsize=9,
-    )
-    plt.tight_layout()
-    plt.show()
-else:
-    print("matplotlib-venn not available")
+fig, ax = plt.subplots(figsize=(6, 6))
+v = venn2(
+    subsets=(len(id_iids - hbcd_iids), len(hbcd_iids - id_iids), len(id_iids & hbcd_iids)),
+    set_labels=("identifiers", "hbcd.fam"),
+    set_colors=["#1f78b4", "#e31a1c"],
+    ax=ax,
+)
+ax.set_title("Identifiers ∩ hbcd.fam (IID level)", fontsize=13)
+from matplotlib.patches import Patch
+ax.legend(
+    handles=[
+        Patch(facecolor="#1f78b4", alpha=0.5, label="identifiers"),
+        Patch(facecolor="#e31a1c", alpha=0.5, label="hbcd.fam"),
+    ],
+    loc="lower left",
+    fontsize=9,
+)
+plt.tight_layout()
+plt.show()
 ```
 
 ---
@@ -218,44 +215,41 @@ How many pscids are shared across the three exclusion criteria?
 ```{python}
 #| label: venn-exclusion-lists
 #| fig-cap: Pscid-level overlap between the three exclusion lists
-if HAS_VENN:
-    lists_names = list(excl_lists.keys())
-    s0 = excl_lists[lists_names[0]]
-    s1 = excl_lists[lists_names[1]]
-    s2 = excl_lists[lists_names[2]]
+lists_names = list(excl_lists.keys())
+s0 = excl_lists[lists_names[0]]
+s1 = excl_lists[lists_names[1]]
+s2 = excl_lists[lists_names[2]]
 
-    subsets = (
-        len(s0 - s1 - s2),
-        len(s1 - s0 - s2),
-        len((s0 & s1) - s2),
-        len(s2 - s0 - s1),
-        len((s0 & s2) - s1),
-        len((s1 & s2) - s0),
-        len(s0 & s1 & s2),
-    )
+subsets = (
+    len(s0 - s1 - s2),
+    len(s1 - s0 - s2),
+    len((s0 & s1) - s2),
+    len(s2 - s0 - s1),
+    len((s0 & s2) - s1),
+    len((s1 & s2) - s0),
+    len(s0 & s1 & s2),
+)
 
-    fig, ax = plt.subplots(figsize=(7, 7))
-    v = venn3(
-        subsets,
-        set_labels=[n.split(":")[0] for n in lists_names],
-        set_colors=["#1f78b4", "#e31a1c", "#33a02c"],
-        ax=ax,
-    )
-    ax.set_title("Exclusion list pscid overlap", fontsize=13)
-    from matplotlib.patches import Patch
-    ax.legend(
-        handles=[
-            Patch(facecolor="#1f78b4", alpha=0.5, label=lists_names[0]),
-            Patch(facecolor="#e31a1c", alpha=0.5, label=lists_names[1]),
-            Patch(facecolor="#33a02c", alpha=0.5, label=lists_names[2]),
-        ],
-        loc="lower left",
-        fontsize=8,
-    )
-    plt.tight_layout()
-    plt.show()
-else:
-    print("matplotlib-venn not available")
+fig, ax = plt.subplots(figsize=(7, 7))
+v = venn3(
+    subsets,
+    set_labels=[n.split(":")[0] for n in lists_names],
+    set_colors=["#1f78b4", "#e31a1c", "#33a02c"],
+    ax=ax,
+)
+ax.set_title("Exclusion list pscid overlap", fontsize=13)
+from matplotlib.patches import Patch
+ax.legend(
+    handles=[
+        Patch(facecolor="#1f78b4", alpha=0.5, label=lists_names[0]),
+        Patch(facecolor="#e31a1c", alpha=0.5, label=lists_names[1]),
+        Patch(facecolor="#33a02c", alpha=0.5, label=lists_names[2]),
+    ],
+    loc="lower left",
+    fontsize=8,
+)
+plt.tight_layout()
+plt.show()
 ```
 
 ---
@@ -267,39 +261,36 @@ All three exclusion lists are combined at the **IID level** (release_candid + C/
 ```{python}
 #| label: venn-combined
 #| fig-cap: Combined exclusions vs hbcd.fam vs par_visit (IID level)
-if HAS_VENN:
-    subsets = (
-        len(all_exc_iids - hbcd_iids - par_iids),
-        len(hbcd_iids - all_exc_iids - par_iids),
-        len((all_exc_iids & hbcd_iids) - par_iids),
-        len(par_iids - all_exc_iids - hbcd_iids),
-        len((all_exc_iids & par_iids) - hbcd_iids),
-        len((hbcd_iids & par_iids) - all_exc_iids),
-        len(all_exc_iids & hbcd_iids & par_iids),
-    )
+subsets = (
+    len(all_exc_iids - hbcd_iids - par_iids),
+    len(hbcd_iids - all_exc_iids - par_iids),
+    len((all_exc_iids & hbcd_iids) - par_iids),
+    len(par_iids - all_exc_iids - hbcd_iids),
+    len((all_exc_iids & par_iids) - hbcd_iids),
+    len((hbcd_iids & par_iids) - all_exc_iids),
+    len(all_exc_iids & hbcd_iids & par_iids),
+)
 
-    fig, ax = plt.subplots(figsize=(7, 7))
-    v = venn3(
-        subsets,
-        set_labels=("Excluded (IID)", "hbcd.fam", "par_visit"),
-        set_colors=["#ff7f00", "#1f78b4", "#33a02c"],
-        ax=ax,
-    )
-    ax.set_title("Combined exclusions ∩ hbcd.fam ∩ par_visit", fontsize=13)
-    from matplotlib.patches import Patch
-    ax.legend(
-        handles=[
-            Patch(facecolor="#ff7f00", alpha=0.5, label="Excluded (IID)"),
-            Patch(facecolor="#1f78b4", alpha=0.5, label="hbcd.fam"),
-            Patch(facecolor="#33a02c", alpha=0.5, label="par_visit"),
-        ],
-        loc="lower left",
-        fontsize=9,
-    )
-    plt.tight_layout()
-    plt.show()
-else:
-    print("matplotlib-venn not available")
+fig, ax = plt.subplots(figsize=(7, 7))
+v = venn3(
+    subsets,
+    set_labels=("Excluded (IID)", "hbcd.fam", "par_visit"),
+    set_colors=["#ff7f00", "#1f78b4", "#33a02c"],
+    ax=ax,
+)
+ax.set_title("Combined exclusions ∩ hbcd.fam ∩ par_visit", fontsize=13)
+from matplotlib.patches import Patch
+ax.legend(
+    handles=[
+        Patch(facecolor="#ff7f00", alpha=0.5, label="Excluded (IID)"),
+        Patch(facecolor="#1f78b4", alpha=0.5, label="hbcd.fam"),
+        Patch(facecolor="#33a02c", alpha=0.5, label="par_visit"),
+    ],
+    loc="lower left",
+    fontsize=9,
+)
+plt.tight_layout()
+plt.show()
 ```
 
 
@@ -307,56 +298,41 @@ else:
 #| label: qc-removal
 #| fig-cap: subjects removed by genomcis QC
 
-qced = pd.read_csv("../data/Removed_individuals.txt")
-qc_pscid_rel = set(qced.loc[~qced.NA1.str.contains("^NA"), "NA1"])
-
-# Map pscid+rel → release_candid+rel for comparison with other IID-level sets
-qc_df = pd.DataFrame({"iid_part": list(qc_pscid_rel)})
-qc_df["pscid"] = qc_df["iid_part"].str[:-1]
-qc_df["rel"] = qc_df["iid_part"].str[-1]
-qc_df = qc_df.merge(
-    identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
-    on="pscid",
-    how="inner",
-)
-qc_iids = set(qc_df["release_candid"].astype(int).astype(str) + qc_df["rel"])
+kept = set(pd.read_csv("../HBCD_genomics_release_br_21p2/keep_list.txt", header = None, sep = " ")[1])
 ```
 
 ```{python}
 #| label: venn-qc-vs-excluded-vs-fam
 #| fig-cap: QC-removed subjects vs exclusions vs hbcd.fam (IID level)
-if HAS_VENN:
-    subsets = (
-        len(qc_iids - all_exc_iids - hbcd_iids),
-        len(all_exc_iids - qc_iids - hbcd_iids),
-        len((qc_iids & all_exc_iids) - hbcd_iids),
-        len(hbcd_iids - qc_iids - all_exc_iids),
-        len((qc_iids & hbcd_iids) - all_exc_iids),
-        len((all_exc_iids & hbcd_iids) - qc_iids),
-        len(qc_iids & all_exc_iids & hbcd_iids),
-    )
+subsets = (
+    len(kept - all_exc_iids - hbcd_iids),
+    len(all_exc_iids - kept - hbcd_iids),
+    len((kept & all_exc_iids) - hbcd_iids),
+    len(hbcd_iids - kept - all_exc_iids),
+    len((kept & hbcd_iids) - all_exc_iids),
+    len((all_exc_iids & hbcd_iids) - kept),
+    len(kept & all_exc_iids & hbcd_iids),
+)
 
-    fig, ax = plt.subplots(figsize=(7, 7))
-    v = venn3(
-        subsets,
-        set_labels=("QC-removed", "Excluded (IID)", "hbcd.fam"),
-        set_colors=["#e31a1c", "#ff7f00", "#1f78b4"],
-        ax=ax,
-    )
-    ax.set_title("QC-removed ∩ Excluded ∩ hbcd.fam (IID level)", fontsize=13)
-    from matplotlib.patches import Patch
-    ax.legend(
-        handles=[
-            Patch(facecolor="#e31a1c", alpha=0.5, label="QC-removed"),
-            Patch(facecolor="#ff7f00", alpha=0.5, label="Excluded (IID)"),
-            Patch(facecolor="#1f78b4", alpha=0.5, label="hbcd.fam"),
-        ],
-        loc="lower left",
-        fontsize=9,
-    )
-    plt.tight_layout()
-    plt.show()
-else:
-    print("matplotlib-venn not available")
+fig, ax = plt.subplots(figsize=(7, 7))
+v = venn3(
+    subsets,
+    set_labels=("QC-pass", "Excluded (IID)", "hbcd.fam"),
+    set_colors=["#e31a1c", "#ff7f00", "#1f78b4"],
+    ax=ax,
+)
+ax.set_title("QC-removed ∩ Excluded ∩ hbcd.fam (IID level)", fontsize=13)
+from matplotlib.patches import Patch
+ax.legend(
+    handles=[
+        Patch(facecolor="#e31a1c", alpha=0.5, label="QC-passed"),
+        Patch(facecolor="#ff7f00", alpha=0.5, label="Excluded (IID)"),
+        Patch(facecolor="#1f78b4", alpha=0.5, label="hbcd.fam"),
+    ],
+    loc="lower left",
+    fontsize=9,
+)
+plt.tight_layout()
+plt.show()
 ```
 
