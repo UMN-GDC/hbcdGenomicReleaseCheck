@@ -308,6 +308,55 @@ else:
 #| fig-cap: subjects removed by genomcis QC
 
 qced = pd.read_csv("../data/Removed_individuals.txt")
-qcRemoved = set(qced.loc[~qced.NA1.str.contains("^NA"), "NA1"])
+qc_pscid_rel = set(qced.loc[~qced.NA1.str.contains("^NA"), "NA1"])
+
+# Map pscid+rel → release_candid+rel for comparison with other IID-level sets
+qc_df = pd.DataFrame({"iid_part": list(qc_pscid_rel)})
+qc_df["pscid"] = qc_df["iid_part"].str[:-1]
+qc_df["rel"] = qc_df["iid_part"].str[-1]
+qc_df = qc_df.merge(
+    identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
+    on="pscid",
+    how="inner",
+)
+qc_iids = set(qc_df["release_candid"].astype(int).astype(str) + qc_df["rel"])
+```
+
+```{python}
+#| label: venn-qc-vs-excluded-vs-fam
+#| fig-cap: QC-removed subjects vs exclusions vs hbcd.fam (IID level)
+if HAS_VENN:
+    subsets = (
+        len(qc_iids - all_exc_iids - hbcd_iids),
+        len(all_exc_iids - qc_iids - hbcd_iids),
+        len((qc_iids & all_exc_iids) - hbcd_iids),
+        len(hbcd_iids - qc_iids - all_exc_iids),
+        len((qc_iids & hbcd_iids) - all_exc_iids),
+        len((all_exc_iids & hbcd_iids) - qc_iids),
+        len(qc_iids & all_exc_iids & hbcd_iids),
+    )
+
+    fig, ax = plt.subplots(figsize=(7, 7))
+    v = venn3(
+        subsets,
+        set_labels=("QC-removed", "Excluded (IID)", "hbcd.fam"),
+        set_colors=["#e31a1c", "#ff7f00", "#1f78b4"],
+        ax=ax,
+    )
+    ax.set_title("QC-removed ∩ Excluded ∩ hbcd.fam (IID level)", fontsize=13)
+    from matplotlib.patches import Patch
+    ax.legend(
+        handles=[
+            Patch(facecolor="#e31a1c", alpha=0.5, label="QC-removed"),
+            Patch(facecolor="#ff7f00", alpha=0.5, label="Excluded (IID)"),
+            Patch(facecolor="#1f78b4", alpha=0.5, label="hbcd.fam"),
+        ],
+        loc="lower left",
+        fontsize=9,
+    )
+    plt.tight_layout()
+    plt.show()
+else:
+    print("matplotlib-venn not available")
 ```
 
