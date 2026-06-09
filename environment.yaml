@@ -6,9 +6,3 @@ channels:
 dependencies:
   - r-base
   - r-matrix
-  - bioconductor-snprelate
-  - bioconductor-gdsfmt
-  - bioconductor-seqarray
-  - bioconductor-seqvartools
-  - bioconductor-genesis
-  - bioconductor-biocparallel
