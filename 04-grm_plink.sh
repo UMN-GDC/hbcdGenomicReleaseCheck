@@ -9,16 +9,8 @@
 #SBATCH --time=12:00:00
 #SBATCH -p agsmall
 
-# =============================================================================
-# grm_plink.sh
-#
-# Computes a Genetic Relatedness Matrix (GRM) using PLINK2 --make-rel
-# from hbcd_rsid_harmonized PLINK files. Output written to PCA directory.
-#
-# PLINK2 produces three files:
-#   .rel      — lower-triangular relatedness matrix (text)
-#   .rel.id   — sample IDs corresponding to matrix rows/columns
-# =============================================================================
+# step 7: compute PLINK2 GRM (--make-rel) from harmonized PLINK files
+# Output: .rel (lower-triangular), .rel.id (sample order)
 
 set -euo pipefail
 
@@ -34,11 +26,6 @@ echo "[$(date)] Starting PLINK GRM computation"
 echo "  Input : ${PLINK_STEM}"
 echo "  Output: ${OUT_STEM}"
 
-# ---------------------------------------------------------------------------
-# PLINK --make-rel computes the genomic relationship matrix
-# 'cov' = use covariance form (standard GRM); default is correlation form
-# 'bin' = write binary output (much faster to read downstream)
-# ---------------------------------------------------------------------------
 plink \
     --bfile   "${PLINK_STEM}" \
     --make-rel square \

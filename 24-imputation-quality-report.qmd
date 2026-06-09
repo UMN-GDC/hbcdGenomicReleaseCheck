@@ -1,0 +1,445 @@
+---
+title: "HBCD Imputation Quality Report"
+author: "HBCD Genetics Team"
+format: html
+editor: source
+execute:
+  cache: true
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(data.table)
+library(glue)
+library(ggridges)
+
+cache_dir <- "gp_cache"
+dir.create(cache_dir, showWarnings = FALSE, recursive = TRUE)
+
+imputed_dirs <- c("imputed/c1", "imputed/c2", "imputed/c3", "imputed/cX")
+```
+
+## Data Discovery
+
+```{r discover-files, cache=TRUE}
+info_files <- list.files(imputed_dirs, pattern = "\\.info\\.gz$",
+                         recursive = TRUE, full.names = TRUE)
+
+manifest <- tibble(
+  file = info_files,
+  chr_raw = str_extract(basename(info_files), "\\d+|X|Y|MT"),
+  chr = fct_inorder(chr_raw)
+) %>%
+  arrange(as.numeric(chr_raw), chr_raw)
+
+n_chr <- nrow(manifest)
+n_chr
+```
+
+## Load and Cache Per-Chromosome
+
+```{r load-and-cache, cache=FALSE}
+process_info <- function(file, chr) {
+  cache_file <- file.path(cache_dir, glue("info_chr_{chr}.rds"))
+  if (file.exists(cache_file)) {
+    return(readRDS(cache_file))
+  }
+
+  dat <- fread(file, select = c("SNP", "MAF", "Rsq"))
+
+  pos <- as.numeric(str_extract(dat$SNP, "(?<=:)\\d+"))
+  if (anyNA(pos)) {
+    pos <- seq_len(nrow(dat))
+  }
+
+  result <- tibble(
+    chr = chr,
+    pos = pos,
+    maf = dat$MAF,
+    rsq = dat$Rsq
+  )
+
+  saveRDS(result, cache_file)
+  result
+}
+
+all_data <- map2_dfr(manifest$file, manifest$chr, process_info) %>%
+  mutate(
+    chr = fct_inorder(chr),
+    maf_bin = cut(maf, breaks = seq(0, 0.5, 0.01), include.lowest = TRUE)
+  )
+
+saveRDS(all_data, file.path(cache_dir, "all_data.rds"))
+nrow(all_data)
+```
+
+## Per-Chromosome R² Histograms
+
+```{r rsq-histograms, cache=TRUE, dependson="load-and-cache"}
+all_data <- readRDS(file.path(cache_dir, "all_data.rds"))
+
+ggplot(all_data, aes(x = rsq)) +
+  geom_histogram(binwidth = 0.02, fill = "steelblue", color = "white", alpha = 0.85) +
+  facet_wrap(~chr, scales = "free_y", ncol = 4) +
+  scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2)) +
+  labs(
+    title = "Imputation Quality (R²) per Chromosome",
+    x = expression(Imputation~R^2),
+    y = "Variant Count"
+  ) +
+  theme_minimal(base_size = 11)
+```
+
+## Smoothed R² Across Each Chromosome
+
+```{r rsq-smoothed, cache=TRUE, dependson="load-and-cache"}
+all_data <- readRDS(file.path(cache_dir, "all_data.rds"))
+
+chr_lens <- all_data %>%
+  group_by(chr) %>%
+  summarise(chr_len = max(pos, na.rm = TRUE)) %>%
+  mutate(chr_mid = chr_len / 2)
+
+all_data %>%
+  sample_frac(0.1) %>%
+  ggplot(aes(x = pos / 1e6, y = rsq)) +
+  geom_point(size = 0.05, alpha = 0.1, color = "grey40") +
+  geom_smooth(se = TRUE, color = "steelblue", fill = "steelblue", alpha = 0.2, span = 0.05) +
+  facet_wrap(~chr, scales = "free_x", ncol = 4) +
+  labs(
+    title = "R² Trend Across Each Chromosome",
+    x = "Position (Mb)",
+    y = expression(Imputation~R^2)
+  ) +
+  theme_minimal(base_size = 11)
+```
+
+## Genome-Wide Smoothed R² (Manhattan Style)
+
+```{r rsq-manhattan, cache=TRUE, dependson="load-and-cache"}
+all_data <- readRDS(file.path(cache_dir, "all_data.rds"))
+
+max_pos <- all_data %>%
+  group_by(chr) %>%
+  summarise(chr_max = max(pos, na.rm = TRUE)) %>%
+  mutate(
+    offset = lag(cumsum(chr_max), default = 0),
+    offset = ifelse(is.na(offset), 0, offset)
+  )
+
+chr_colors <- rep(c("navy", "grey60"), 13)
+
+gwas_data <- all_data %>%
+  left_join(max_pos, by = "chr") %>%
+  mutate(pos_gws = pos + offset)
+
+chrom_ticks <- max_pos %>%
+  mutate(mid = offset + chr_max / 2)
+
+gwas_data %>%
+  sample_frac(0.1) %>%
+  ggplot(aes(x = pos_gws, y = rsq, color = chr)) +
+  geom_point(size = 0.1, alpha = 0.3) +
+  geom_smooth(aes(group = 1), se = TRUE, color = "darkred", fill = "darkred",
+              alpha = 0.15, span = 0.02, size = 0.5) +
+  scale_color_manual(values = chr_colors, guide = "none") +
+  scale_x_continuous(breaks = chrom_ticks$mid,
+                     labels = chrom_ticks$chr) +
+  labs(
+    title = "Genome-Wide R²",
+    x = "Chromosome",
+    y = expression(Imputation~R^2)
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid.minor.x = element_blank())
+```
+
+## R² vs MAF
+
+```{r rsq-vs-maf, cache=TRUE, dependson="load-and-cache"}
+all_data <- readRDS(file.path(cache_dir, "all_data.rds"))
+
+all_data %>%
+  ggplot(aes(x = maf, y = rsq)) +
+  geom_hex(bins = 80) +
+  scale_fill_viridis_c(trans = "log10", labels = scales::comma) +
+  facet_wrap(~chr, ncol = 4) +
+  labs(
+    title = "R² vs Minor Allele Frequency",
+    x = "MAF",
+    y = expression(Imputation~R^2),
+    fill = "Variant\nCount"
+  ) +
+  theme_minimal(base_size = 11)
+
+all_data %>%
+  mutate(maf_bin = cut(maf, breaks = seq(0, 0.5, 0.01), include.lowest = TRUE)) %>%
+  group_by(maf_bin) %>%
+  summarise(
+    mean_rsq = mean(rsq, na.rm = TRUE),
+    median_rsq = median(rsq, na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  ggplot(aes(x = maf_bin)) +
+  geom_ribbon(aes(ymin = median_rsq, ymax = mean_rsq, group = 1),
+              fill = "steelblue", alpha = 0.2) +
+  geom_line(aes(y = mean_rsq, group = 1, color = "Mean"), size = 0.8) +
+  geom_line(aes(y = median_rsq, group = 1, color = "Median"), size = 0.8) +
+  scale_color_manual(values = c(Mean = "steelblue", Median = "darkorange")) +
+  labs(
+    title = "R² by MAF Bin (Genome-Wide)",
+    x = "MAF Bin",
+    y = expression(Imputation~R^2),
+    color = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Cumulative INFO Threshold
+
+```{r cumulative-info, cache=TRUE, dependson="load-and-cache"}
+all_data <- readRDS(file.path(cache_dir, "all_data.rds"))
+
+all_data %>%
+  group_by(chr) %>%
+  summarise(
+    total = n(),
+    gt_03 = mean(rsq > 0.3, na.rm = TRUE),
+    gt_05 = mean(rsq > 0.5, na.rm = TRUE),
+    gt_08 = mean(rsq > 0.8, na.rm = TRUE),
+    gt_09 = mean(rsq > 0.9, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(-c(chr, total), names_to = "threshold", values_to = "prop") %>%
+  mutate(threshold = str_replace(threshold, "gt_0", "R² > 0.")) %>%
+  ggplot(aes(x = chr, y = prop, fill = threshold)) +
+  geom_col(position = "dodge", alpha = 0.85) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Proportion of Variants Above R² Thresholds",
+    x = "Chromosome", y = "Proportion of Variants", fill = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Imputation Yield
+
+```{r imputation-yield, cache=TRUE}
+pvar_files <- list.files("data", pattern = "^temp_raw_chr.*\\.pvar$", full.names = TRUE)
+pre_counts <- tibble()
+if (length(pvar_files) > 0) {
+  pre_counts <- map_dfr(pvar_files, ~{
+    chr <- str_extract(basename(.x), "\\d+|X|Y|MT")
+    n <- as.numeric(str_extract(system(glue("bcftools view --no-header {.x} | wc -l"),
+                                       intern = TRUE), "\\d+"))
+    tibble(chr = chr, pre = n)
+  })
+}
+
+yield_file <- file.path(cache_dir, "imputation_yield.csv.gz")
+if (file.exists(yield_file)) {
+  yield <- read_csv(yield_file, col_types = cols())
+
+  yield_plot <- yield %>%
+    { if (nrow(pre_counts) > 0) left_join(., pre_counts, by = "chr") else . } %>%
+    mutate(chr = fct_inorder(chr))
+
+  p <- yield_plot %>%
+    { if ("pre" %in% names(.)) {
+        select(., chr, pre, total, gt_03, gt_05) %>%
+          pivot_longer(-chr, names_to = "metric", values_to = "count") %>%
+          mutate(metric = recode(metric, pre = "Genotyped", total = "Imputed (all)",
+                                 gt_03 = "Imputed (R² > 0.3)", gt_05 = "Imputed (R² > 0.5)"))
+      } else {
+        select(., chr, total, gt_03, gt_05) %>%
+          pivot_longer(-chr, names_to = "metric", values_to = "count") %>%
+          mutate(metric = recode(metric, total = "Imputed (all)",
+                                 gt_03 = "Imputed (R² > 0.3)", gt_05 = "Imputed (R² > 0.5)"))
+      }
+    }
+
+  ggplot(p, aes(x = chr, y = count / 1e6, fill = metric)) +
+    geom_col(position = "dodge", alpha = 0.85) +
+    labs(
+      title = "Imputation Yield per Chromosome",
+      x = "Chromosome", y = "Variants (millions)", fill = NULL
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+} else {
+  cat("Run 26-aggregate_gp.SLURM first to generate imputation_yield.csv.gz")
+}
+```
+
+## Call Rate vs R²
+
+```{r call-rate-vs-rsq, cache=TRUE}
+cr_file <- file.path(cache_dir, "call_rate_by_ancestry.csv.gz")
+if (file.exists(cr_file)) {
+  cr <- read_csv(cr_file, col_types = cols()) %>%
+    mutate(maf_bin = cut(maf, c(0, 0.001, 0.01, 0.05, 0.1), include.lowest = TRUE))
+
+  ggplot(cr, aes(x = rsq, y = call_rate)) +
+    geom_hex(bins = 60) +
+    scale_fill_viridis_c(trans = "log10", labels = scales::comma) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", alpha = 0.4) +
+    facet_wrap(~ancestry) +
+    labs(
+      title = "Empirical Call Rate vs Imputation R² by Ancestry",
+      subtitle = "Rare imputed variants (MAF < 0.1); call rate = proportion of samples with max(GP) > 0.9",
+      x = expression(Imputation~R^2), y = "Empirical Call Rate", fill = "Variants"
+    ) +
+    theme_minimal(base_size = 10)
+
+  cr %>%
+    group_by(ancestry, maf_bin) %>%
+    summarise(mean_call = mean(call_rate, na.rm = TRUE), .groups = "drop") %>%
+    ggplot(aes(x = maf_bin, y = mean_call, color = ancestry, group = ancestry)) +
+    geom_line(size = 0.8) + geom_point(size = 1.5) +
+    labs(
+      title = "Mean Call Rate by MAF Bin and Ancestry",
+      x = "MAF Bin", y = "Mean Call Rate", color = NULL
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+} else {
+  cat("Run GP precomputation + aggregation first")
+}
+```
+
+## Per-Sample Confident Rare Variant Calls
+
+```{r per-sample-confident, cache=TRUE}
+per_sample <- read_csv(file.path(cache_dir, "per_sample_maxgp.csv.gz"), col_types = cols())
+
+per_sample %>%
+  ggplot(aes(x = n_confident, fill = ancestry)) +
+  geom_histogram(binwidth = 100, alpha = 0.75, color = "white", size = 0.1) +
+  facet_wrap(~ancestry, scales = "free_y") +
+  labs(
+    title = "Per-Sample Count of Confident Rare Variant Calls",
+    subtitle = "Variants with max(GP) > 0.9",
+    x = "Number of Confident Rare Variants", y = "Sample Count", fill = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "none")
+
+per_sample %>%
+  arrange(ancestry, n_confident) %>%
+  group_by(ancestry) %>%
+  mutate(rank = row_number(), pct = rank / max(rank)) %>%
+  ggplot(aes(x = n_confident, y = pct, color = ancestry)) +
+  geom_step(size = 0.8) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Cumulative Distribution of Confident Rare Variant Calls",
+    x = "Number of Confident Rare Variants",
+    y = "Percentile", color = NULL
+  ) +
+  theme_minimal(base_size = 11)
+
+## Genotype Posterior Probability (GP) — Rare Variants
+```
+
+```{r gp-load}
+per_sample <- read_csv(file.path(cache_dir, "per_sample_maxgp.csv.gz"),
+                       col_types = cols())
+hist_bins  <- read_csv(file.path(cache_dir, "histogram_bins.csv.gz"),
+                       col_types = cols())
+
+ridge_raw <- read_csv(file.path(cache_dir, "ridge_samples.csv.gz"),
+                      col_types = cols()) %>%
+  mutate(chromosome = fct_inorder(chromosome))
+```
+
+### Average max(GP) per Individual
+
+```{r gp-outliers, cache=TRUE}
+outliers <- per_sample %>%
+  group_by(ancestry) %>%
+  mutate(
+    z = (avg_maxgp - mean(avg_maxgp, na.rm = TRUE)) / sd(avg_maxgp, na.rm = TRUE),
+    flag = z < -3
+  ) %>%
+  ungroup()
+
+n_flagged <- sum(outliers$flag)
+
+ggplot(outliers, aes(x = reorder(sample_pos, avg_maxgp), y = avg_maxgp,
+                     color = ancestry)) +
+  geom_point(size = 0.8, alpha = 0.6) +
+  geom_point(data = filter(outliers, flag), size = 2, shape = 8, color = "red") +
+  labs(
+    title = "Per-Sample Mean max(GP) for Rare Variants",
+    subtitle = sprintf("Red stars: |z| > 3 (%d flagged)", n_flagged),
+    x = "Sample (ordered by mean max GP)",
+    y = "Average max(GP)"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+outliers %>%
+  mutate(flag_label = ifelse(flag, "Flagged", "OK")) %>%
+  ggplot(aes(x = avg_maxgp, fill = flag_label)) +
+  geom_histogram(binwidth = 0.005, alpha = 0.75, color = "white", size = 0.1) +
+  facet_wrap(~ancestry, scales = "free_y") +
+  scale_fill_manual(values = c(OK = "steelblue", Flagged = "red")) +
+  labs(
+    title = "Distribution of Per-Sample Mean max(GP) by Ancestry",
+    x = "Average max(GP)",
+    y = "Sample Count",
+    fill = NULL
+  ) +
+  theme_minimal(base_size = 11)
+```
+
+### Histogram of max(GP) by Ancestry
+
+```{r gp-histograms, cache=TRUE}
+hist_bins <- hist_bins %>%
+  mutate(bin_center = (bin - 0.5) / 50)
+
+ggplot(hist_bins, aes(x = bin_center, y = count, fill = ancestry)) +
+  geom_area(alpha = 0.5, position = "identity") +
+  facet_wrap(~ancestry, scales = "free_y") +
+  labs(
+    title = "max(GP) Distribution by Ancestry — All Rare Variants",
+    x = "max(GP)",
+    y = "Count (variant-samples)",
+    fill = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "none")
+```
+
+### Ridge Plot of max(GP) by Chromosome
+
+```{r gp-ridges, cache=TRUE}
+ridge_raw %>%
+  ggplot(aes(x = maxgp, y = chromosome, fill = ancestry)) +
+  ggridges::geom_density_ridges(alpha = 0.3, scale = 1.5, rel_min_height = 0.005) +
+  scale_fill_viridis_d() +
+  labs(
+    title = "max(GP) Density by Chromosome and Ancestry",
+    x = "max(GP)",
+    y = "Chromosome"
+  ) +
+  theme_minimal(base_size = 10)
+
+ridge_raw %>%
+  group_by(chromosome, ancestry) %>%
+  summarise(median_gp = median(maxgp, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = chromosome, y = median_gp, color = ancestry, group = ancestry)) +
+  geom_line(size = 0.8) +
+  geom_point(size = 1.5) +
+  labs(
+    title = "Median max(GP) per Chromosome by Ancestry",
+    x = "Chromosome",
+    y = "Median max(GP)"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```

@@ -9,6 +9,8 @@
 #SBATCH --time=24:00:00
 #SBATCH -p agsmall
 
+# step 10: SLURM wrapper for PC-Relate pipeline
+
 module load R/4.4.2-openblas-rocky8
 
 PCA_DIR=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026/PCA

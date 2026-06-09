@@ -9,15 +9,9 @@
 #SBATCH --time=12:00:00
 #SBATCH -p agsmall
 
-# =============================================================================
-# grm_gcta.sh
-#
-# Computes a Genetic Relatedness Matrix (GRM) using GCTA from
-# hbcd_rsid_harmonized PLINK files. Output written to PCA directory.
-#
-# The GRM is computed in chromosome chunks (--make-grm-part) to manage
-# memory, then merged into a single GRM.
-# =============================================================================
+# step 6: compute GCTA GRM from harmonized PLINK files
+# Output written to PCA directory.
+# The GRM is computed in chromosome chunks (--make-grm-part) then merged.
 
 set -euo pipefail
 
@@ -27,7 +21,7 @@ GCTA=/projects/standard/gdc/shared/grm_tools/gcta64
 PLINK_STEM=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026/AE/rsid_updated/hbcd_rsid_harmonized
 OUT_DIR=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026/PCA
 OUT_STEM="${OUT_DIR}/hbcd_gcta_grm"
-N_PARTS=22   # one part per autosome
+N_PARTS=22
 
 mkdir -p "${OUT_DIR}" logs
 
@@ -35,12 +29,7 @@ echo "[$(date)] Starting GCTA GRM computation"
 echo "  Input : ${PLINK_STEM}"
 echo "  Output: ${OUT_STEM}"
 
-# ---------------------------------------------------------------------------
-# Step 1 — Compute GRM in parts (one per chromosome chunk)
-# This avoids loading all variants into memory at once
-# ---------------------------------------------------------------------------
 echo "[$(date)] Step 1: Computing GRM in ${N_PARTS} parts"
-
 for PART in $(seq 1 ${N_PARTS}); do
     echo "  Computing part ${PART}/${N_PARTS}..."
     "${GCTA}" \
@@ -50,12 +39,7 @@ for PART in $(seq 1 ${N_PARTS}); do
         --thread-num "${SLURM_CPUS_PER_TASK:-10}"
 done
 
-# ---------------------------------------------------------------------------
-# Step 2 — Merge all parts into a single GRM
-# ---------------------------------------------------------------------------
 echo "[$(date)] Step 2: Merging GRM parts"
-
-# Build list of part files
 > "${OUT_DIR}/grm_parts.txt"
 for PART in $(seq 1 ${N_PARTS}); do
     echo "${OUT_STEM}.part_${N_PARTS}_${PART}" >> "${OUT_DIR}/grm_parts.txt"
@@ -67,7 +51,6 @@ done
     --out     "${OUT_STEM}" \
     --thread-num "${SLURM_CPUS_PER_TASK:-10}"
 
-# Clean up part files
 rm -f "${OUT_STEM}".part_*.grm.bin \
       "${OUT_STEM}".part_*.grm.N.bin \
       "${OUT_STEM}".part_*.grm.id

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# step 5: validate no excluded subjects appear in the final hbcd.fam
+
 import pandas as pd
 from pathlib import Path
 from _lib import DATA_DIR, load_additional_excluded_pscids
@@ -8,7 +10,6 @@ RELEASE_DIR = Path(
     "/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data/"
 )
 
-# -- load excluded pscids and map to release_candids --
 excluded = load_additional_excluded_pscids()
 print(f"Excluded pscids  : {len(excluded)}")
 
@@ -27,7 +28,6 @@ exc_rc = set(
 print(f"Mapped to RC     : {len(exc_rc)}")
 print()
 
-# -- check output hbcd.fam --
 hbcd = pd.read_csv(
     RELEASE_DIR / "hbcd.fam",
     sep=r"\s+",
@@ -45,7 +45,6 @@ if overlap:
     print(f"           overlapping RC    : {sorted(overlap)[:20]}")
 print()
 
-# -- break down by exclusion reason --
 raw = pd.read_csv(DATA_DIR / "HBCDexclusions.csv")
 for col in raw.columns:
     pscids = set(raw[col].dropna().astype(str).str.strip())
