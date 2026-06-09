@@ -1,8 +1,7 @@
 name: hbcd-release
 channels:
-  - bioconda
   - conda-forge
 dependencies:
-  - r-base >=4.3,<4.4
+  - r-base
   - r-matrix
   - r-biocmanager
