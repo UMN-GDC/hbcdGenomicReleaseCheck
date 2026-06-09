@@ -4,8 +4,8 @@
 library(GENESIS)
 library(Matrix)
 
-WORK    <- "/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026"
-out_dir <- file.path(WORK, "PCA/pca_ir")
+DATA_DIR <- "/projects/standard/basu_hbcd/shared/data"
+out_dir  <- DATA_DIR
 
 save_both <- function(df, stem) {
   write.csv(df, file = paste0(stem, ".csv"), row.names = FALSE, quote = FALSE)

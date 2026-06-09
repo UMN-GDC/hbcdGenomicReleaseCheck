@@ -2,13 +2,15 @@
 
 # step 5: validate no excluded subjects appear in the final hbcd.fam
 
+import sys
 import pandas as pd
-from pathlib import Path
-from _lib import DATA_DIR, load_additional_excluded_pscids
+from _lib import DATA_DIR, get_release_dir, load_additional_excluded_pscids
 
-RELEASE_DIR = Path(
-    "/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data/"
-)
+# Accept --release-dir / -r override, default from env/HBCD_RELEASE
+if len(sys.argv) > 1 and sys.argv[1] in ("--release-dir", "-r"):
+    RELEASE_DIR = Path(sys.argv[2])
+else:
+    RELEASE_DIR = get_release_dir()
 
 excluded = load_additional_excluded_pscids()
 print(f"Excluded pscids  : {len(excluded)}")

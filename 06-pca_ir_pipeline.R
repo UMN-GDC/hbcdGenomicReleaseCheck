@@ -8,14 +8,14 @@ library(SeqArray)
 library(SeqVarTools)
 library(GENESIS)
 
-WORK         <- "/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026"
+DATA_DIR     <- "/projects/standard/basu_hbcd/shared/data"
 NAME         <- "hbcd_rsid_harmonized"
-plink_prefix <- file.path(WORK, "AE/rsid_updated", NAME)
-king_kin0    <- file.path(WORK, "relatedness", "kinships.kin0")
-king_kin     <- file.path(WORK, "relatedness", "kinships.kin")
-gds_file     <- file.path(WORK, "PCA/gds", paste0(NAME, ".gds"))
+plink_prefix <- file.path(DATA_DIR, "onlyQc")
+king_kin0    <- file.path("/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026/relatedness", "kinships.kin0")
+king_kin     <- file.path("/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026/relatedness", "kinships.kin")
+gds_file     <- file.path(DATA_DIR, "gds", paste0(NAME, ".gds"))
 seq_gds_file <- sub("\\.gds$", "_seq.gds", gds_file)
-out_dir      <- file.path(WORK, "PCA/pca_ir")
+out_dir      <- DATA_DIR
 
 dir.create(dirname(gds_file), showWarnings = FALSE, recursive = TRUE)
 dir.create(out_dir,           showWarnings = FALSE, recursive = TRUE)

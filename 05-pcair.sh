@@ -13,11 +13,10 @@
 
 module load R/4.4.2-openblas-rocky8
 
-WORK=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026
-PCA_DIR="${WORK}/PCA"
+DATA_DIR=/projects/standard/basu_hbcd/shared/data
 
-mkdir -p "${PCA_DIR}/pca_ir" "${PCA_DIR}/gds" logs
+mkdir -p "${DATA_DIR}/gds" logs
 
 echo "[$(date)] Starting PC-AiR pipeline"
-Rscript "${PCA_DIR}/pca_ir_pipeline.R"
+Rscript "06-pca_ir_pipeline.R"
 echo "[$(date)] Done."

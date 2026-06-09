@@ -10,7 +10,7 @@
 #SBATCH -p agsmall
 
 # step 6: compute GCTA GRM from harmonized PLINK files
-# Output written to PCA directory.
+# Output written to DATA_DIR.
 # The GRM is computed in chromosome chunks (--make-grm-part) then merged.
 
 set -euo pipefail
@@ -19,11 +19,11 @@ module load intel-oneapi-mkl/2023.1.0-intel-oneapi-mpi-2021.9.0-oneapi-2023.1.0-
 
 GCTA=/projects/standard/gdc/shared/grm_tools/gcta64
 PLINK_STEM=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026/AE/rsid_updated/hbcd_rsid_harmonized
-OUT_DIR=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026/PCA
-OUT_STEM="${OUT_DIR}/hbcd_gcta_grm"
+DATA_DIR=/projects/standard/basu_hbcd/shared/data
+OUT_STEM="${DATA_DIR}/hbcd_gcta_grm"
 N_PARTS=22
 
-mkdir -p "${OUT_DIR}" logs
+mkdir -p logs
 
 echo "[$(date)] Starting GCTA GRM computation"
 echo "  Input : ${PLINK_STEM}"
@@ -40,13 +40,13 @@ for PART in $(seq 1 ${N_PARTS}); do
 done
 
 echo "[$(date)] Step 2: Merging GRM parts"
-> "${OUT_DIR}/grm_parts.txt"
+> "${DATA_DIR}/grm_parts.txt"
 for PART in $(seq 1 ${N_PARTS}); do
-    echo "${OUT_STEM}.part_${N_PARTS}_${PART}" >> "${OUT_DIR}/grm_parts.txt"
+    echo "${OUT_STEM}.part_${N_PARTS}_${PART}" >> "${DATA_DIR}/grm_parts.txt"
 done
 
 "${GCTA}" \
-    --mgrm    "${OUT_DIR}/grm_parts.txt" \
+    --mgrm    "${DATA_DIR}/grm_parts.txt" \
     --make-grm \
     --out     "${OUT_STEM}" \
     --thread-num "${SLURM_CPUS_PER_TASK:-10}"

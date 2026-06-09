@@ -13,10 +13,10 @@
 
 module load R/4.4.2-openblas-rocky8
 
-PCA_DIR=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026/PCA
+DATA_DIR=/projects/standard/basu_hbcd/shared/data
 
 mkdir -p logs
 
 echo "[$(date)] Starting PC-Relate pipeline"
-Rscript "${PCA_DIR}/pca_relate_pipeline.R"
+Rscript "08-pca_relate_pipeline.R"
 echo "[$(date)] Done."

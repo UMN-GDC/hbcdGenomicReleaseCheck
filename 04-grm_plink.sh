@@ -17,10 +17,10 @@ set -euo pipefail
 module load plink
 
 PLINK_STEM=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026/AE/rsid_updated/hbcd_rsid_harmonized
-OUT_DIR=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026/PCA
-OUT_STEM="${OUT_DIR}/hbcd_plink_grm"
+DATA_DIR=/projects/standard/basu_hbcd/shared/data
+OUT_STEM="${DATA_DIR}/hbcd_plink_grm"
 
-mkdir -p "${OUT_DIR}" logs
+mkdir -p logs
 
 echo "[$(date)] Starting PLINK GRM computation"
 echo "  Input : ${PLINK_STEM}"

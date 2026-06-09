@@ -1,10 +1,33 @@
 """Shared helpers for the HBCD genomics release pipeline."""
+import os
 from pathlib import Path
 
 import pandas as pd
 
 DATA_DIR = Path("/projects/standard/basu_hbcd/shared/data")
-RELEASE = "br_21p2"
+DEFAULT_RELEASE = "br_21p2"
+
+# If HBCD_RELEASE env var is set, all scripts use that release
+_RELEASE_ENV = os.environ.get("HBCD_RELEASE", DEFAULT_RELEASE)
+
+
+def get_release_dir(release=None):
+    """Return the release data directory, from env var or explicit argument.
+
+    The directory is ``<DATA_DIR.parent>/HBCD_genomics_release_<release>/data/``.
+    If *release* is ``None`` (default) the ``HBCD_RELEASE`` environment
+    variable is consulted, falling back to ``DEFAULT_RELEASE``.
+    """
+    if release is None:
+        release = _RELEASE_ENV
+    return DATA_DIR.parent / f"HBCD_genomics_release_{release}" / "data"
+
+
+def get_release_base(release=None):
+    """Return the release base directory (parent of ``data/``)."""
+    return get_release_dir(release).parent
+
+
 PAR_VISIT_FILE = "par_visit_data_br21_1.tsv"
 IDENTIFIERS_FILE = "release_identifiers_20260526.csv"
 EXCLUSION_FILE = "HBCD_genetics_QC1_missing_race_LORIS.xlsx"

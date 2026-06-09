@@ -10,17 +10,24 @@
 # step 29: filter imputed VCFs to only include release subjects
 # Uses keep_list.txt from step 25 as the sample whitelist.
 # Run AFTER step 25 (keep_list.txt must exist).
+#
+# Env: HBCD_RELEASE  — release tag (default: br_21p2)
+#       RELEASE_BASE — override release base dir (default: derived)
 
 set -euo pipefail
 
 module load bcftools
 
+DATA_DIR=/projects/standard/basu_hbcd/shared/data
+: "${HBCD_RELEASE:=br_21p2}"
+: "${RELEASE_BASE:=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_${HBCD_RELEASE}}"
+
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
 chr="${CHROMS[$SLURM_ARRAY_TASK_ID]}"
 
-KEEP_LIST="/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/keep_list.txt"
-IMPUTED_DIRS=("imputed/c1" "imputed/c2" "imputed/c3" "imputed/cX")
-OUTDIR="imputed/release"
+KEEP_LIST="${RELEASE_BASE}/keep_list.txt"
+IMPUTED_DIRS=("${DATA_DIR}/imputed/c1" "${DATA_DIR}/imputed/c2" "${DATA_DIR}/imputed/c3" "${DATA_DIR}/imputed/cX")
+OUTDIR="${RELEASE_BASE}/data/imputed"
 
 mkdir -p "$OUTDIR" logs
 

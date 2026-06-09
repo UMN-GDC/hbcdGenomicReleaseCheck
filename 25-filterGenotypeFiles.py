@@ -8,6 +8,8 @@ from pathlib import Path
 
 from _lib import (
     DATA_DIR,
+    get_release_dir,
+    get_release_base,
     load_par_visit_candids,
     load_identifiers,
     load_excluded_release_candids,
@@ -16,11 +18,9 @@ from _lib import (
 )
 
 data_prefix = Path("onlyQc")
-release_dir = Path(
-    "/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data/"
-)
+release_dir = get_release_dir()
 release_dir.mkdir(parents=True, exist_ok=True)
-release_base = release_dir.parent
+release_base = get_release_base()
 
 # -- identifiers --
 identifiers = load_identifiers()

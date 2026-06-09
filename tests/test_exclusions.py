@@ -1,49 +1,128 @@
-"""Ensure HBCDexclusions.csv pscids do not appear in the pipeline output."""
+"""Ensure all exclusion sources are properly applied to the final output.
 
+Three independent exclusion mechanisms are checked:
+  1. HBCDexclusions.csv        — pscid-level exclusion (multi-column reasons)
+  2. Excel exclusion list      — release_candid-level exclusion
+  3. Removed_individuals.txt   — IID-level exclusion written by the pipeline
+
+Set ``HBCD_RELEASE`` env var to test against a different release.
+"""
 import pandas as pd
-from pathlib import Path
+import pytest
 
-from _lib import DATA_DIR, load_additional_excluded_pscids
-
-RELEASE_DIR = Path(
-    "/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data/"
+from _lib import (
+    DATA_DIR,
+    get_release_dir,
+    get_release_base,
+    load_additional_excluded_pscids,
+    load_excluded_release_candids,
+    load_identifiers,
 )
 
 
-def test_excluded_pscids_absent_from_hbcd_fam():
-    hbcd_fam_path = RELEASE_DIR / "hbcd.fam"
-    if not hbcd_fam_path.exists():
-        import pytest
+def _load_hbcd_fam():
+    p = get_release_dir() / "hbcd.fam"
+    if not p.exists():
         pytest.skip("hbcd.fam not found — run pipeline first")
-
-    hbcd_fam = pd.read_csv(
-        hbcd_fam_path,
-        sep=r"\s+",
-        header=None,
+    return pd.read_csv(
+        p, sep=r"\s+", header=None,
         names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
     )
-    fam_rc = set(
-        hbcd_fam.loc[hbcd_fam["FID"] != 0, "FID"].dropna().unique()
-    )
 
-    excluded = load_additional_excluded_pscids()
-    assert len(excluded) > 0, "No pscids loaded from HBCDexclusions.csv"
 
-    identifiers = pd.read_csv(DATA_DIR / "release_identifiers_20260526.csv")
-    identifiers = identifiers[identifiers["release_candid"] != "release_candid"]
-    identifiers["release_candid"] = pd.to_numeric(identifiers["release_candid"])
-    identifiers = identifiers.dropna(subset=["release_candid"])
-    identifiers["pscid"] = identifiers["pscid"].astype(str).str.strip()
+def _fam_release_candids(fam):
+    """Return the set of non-zero FID values (= release_candids)."""
+    return set(fam.loc[fam["FID"] != 0, "FID"].dropna().astype(int).unique())
 
+
+def _fam_iids(fam):
+    return set(fam["IID"].astype(str))
+
+
+# ── 1. HBCDexclusions.csv (pscid-level) ─────────────────────────────────
+
+
+def test_hbcdcsv_excluded_pscids_absent():
+    """Every pscid listed in HBCDexclusions.csv maps to a release_candid
+    that is NOT present in hbcd.fam."""
+    hbcd = _load_hbcd_fam()
+    fam_rc = _fam_release_candids(hbcd)
+
+    excluded_pscids = load_additional_excluded_pscids()
+    assert len(excluded_pscids) > 0, "HBCDexclusions.csv is empty"
+
+    ids = load_identifiers()
     exc_rc = set(
-        identifiers.loc[identifiers["pscid"].isin(excluded), "release_candid"]
-        .dropna()
-        .astype(int)
-        .unique()
+        ids.loc[ids["pscid"].isin(excluded_pscids), "release_candid"]
+        .dropna().astype(int).unique()
     )
 
-    bad = exc_rc & fam_rc
-    assert len(bad) == 0, (
-        f"{len(bad)} excluded pscid(s) map to release_candid in hbcd.fam: "
-        f"{sorted(bad)[:20]}"
+    overlap = fam_rc & exc_rc
+    assert len(overlap) == 0, (
+        f"{len(overlap)} HBCDexclusions pscid(s) map to release_candid "
+        f"found in hbcd.fam: {sorted(overlap)[:20]}"
+    )
+
+
+def test_each_hbcdcsv_exclusion_reason_individually():
+    """Each column of HBCDexclusions.csv is checked separately — no single
+    exclusion reason should leak a subject into the output."""
+    hbcd = _load_hbcd_fam()
+    fam_rc = _fam_release_candids(hbcd)
+    ids = load_identifiers()
+    raw = pd.read_csv(DATA_DIR / "HBCDexclusions.csv")
+
+    for col in raw.columns:
+        pscids = set(raw[col].dropna().astype(str).str.strip())
+        pscids = {p for p in pscids if p and p != "nan"}
+        if not pscids:
+            continue
+        col_rc = set(
+            ids.loc[ids["pscid"].isin(pscids), "release_candid"]
+            .dropna().astype(int).unique()
+        )
+        overlap = fam_rc & col_rc
+        assert len(overlap) == 0, (
+            f"{len(overlap)} subject(s) from HBCDexclusions column "
+            f"'{col}' present in hbcd.fam: {sorted(overlap)[:15]}"
+        )
+
+
+# ── 2. Excel exclusion list (release_candid-level) ──────────────────────
+
+
+def test_excel_excluded_release_candids_absent():
+    """Every release_candid marked for exclusion in the Excel spreadsheet
+    is absent from hbcd.fam."""
+    hbcd = _load_hbcd_fam()
+    fam_rc = _fam_release_candids(hbcd)
+
+    exc_rc = load_excluded_release_candids()
+    assert len(exc_rc) > 0, "Excel exclusion list is empty"
+
+    overlap = fam_rc & exc_rc
+    assert len(overlap) == 0, (
+        f"{len(overlap)} Excel-excluded release_candid(s) "
+        f"present in hbcd.fam: {sorted(overlap)[:20]}"
+    )
+
+
+# ── 3. Removed_individuals.txt (IID-level, written by pipeline) ──────────
+
+
+def test_removed_individuals_absent():
+    """Every IID listed in Removed_individuals.txt is absent from hbcd.fam."""
+    hbcd = _load_hbcd_fam()
+    fam_iids = _fam_iids(hbcd)
+
+    p = get_release_base() / "Removed_individuals.txt"
+    if not p.exists():
+        pytest.skip("Removed_individuals.txt not found")
+    removed = pd.read_csv(p, delim_whitespace=True, header=None, names=["IID"])
+    removed_iids = set(removed["IID"].astype(str))
+
+    overlap = fam_iids & removed_iids
+    assert len(overlap) == 0, (
+        f"{len(overlap)} removed IID(s) present in hbcd.fam: "
+        f"{sorted(overlap)[:20]}"
     )

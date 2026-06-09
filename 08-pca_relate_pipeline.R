@@ -11,16 +11,16 @@ suppressPackageStartupMessages({
   library(BiocParallel)
 })
 
-WORK         <- "/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_May2026"
+DATA_DIR     <- "/projects/standard/basu_hbcd/shared/data"
 NAME         <- "hbcd_rsid_harmonized"
 N_PCS        <- 20L
 N_CORES      <- 32L
 VARIANT_BLOCK <- 50000L
 
-gds_file     <- file.path(WORK, "PCA/gds", paste0(NAME, ".gds"))
+gds_file     <- file.path(DATA_DIR, "gds", paste0(NAME, ".gds"))
 seq_gds_file <- sub("\\.gds$", "_seq.gds", gds_file)
-pcair_rds    <- file.path(WORK, "PCA/pca_ir", paste0(NAME, "_pcaobj.RDS"))
-out_dir      <- file.path(WORK, "PCA/pca_ir")
+pcair_rds    <- file.path(DATA_DIR, paste0(NAME, "_pcaobj.RDS"))
+out_dir      <- DATA_DIR
 out_rds      <- file.path(out_dir, paste0(NAME, "_pcrelate.RDS"))
 
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)

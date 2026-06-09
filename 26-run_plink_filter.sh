@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # step 4: PLINK2 --keep to filter onlyQc → hbcd (the release set)
+# Usage: RELEASE_DIR=/path/to/release/data ./26-run_plink_filter.sh
+# Defaults to HBCD_genomics_release_br_21p2/data when HBCD_RELEASE / RELEASE_DIR unset.
 
 module load plink/2.00-alpha-091019
 
 dataDIR=/projects/standard/basu_hbcd/shared/data
-releaseDir=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data
+: "${RELEASE_DIR:=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data}"
+releaseDir="${RELEASE_DIR}"
 
 plink2 \
     --bfile "${dataDIR}/onlyQc" \
