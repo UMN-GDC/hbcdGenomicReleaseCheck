@@ -15,7 +15,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) {
     install.packages("BiocManager", repos = "https://cran.r-project.org")
 }
 
-BiocManager::install(pkgs, ask = FALSE, update = TRUE, version = "3.20")
+BiocManager::install(pkgs, ask = FALSE, update = TRUE, version = "3.18")
 
 for (pkg in pkgs) {
     if (!requireNamespace(pkg, quietly = TRUE)) {
