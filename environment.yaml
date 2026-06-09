@@ -4,5 +4,6 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - r-base
+  - r-base >=4.4
   - r-matrix
+  - r-biocmanager
