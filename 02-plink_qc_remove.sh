@@ -10,27 +10,30 @@ HST_DIR=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_July2025
 DATA_DIR=/projects/standard/basu_hbcd/shared/data
 REMOVE_FILE="${DATA_DIR}/Remove.txt"
 CONTROLS_FILE="${DATA_DIR}/Removed_controls.txt"
+MERGED_REMOVE="${DATA_DIR}/_merged_remove.txt"
 OUT_PREFIX="${DATA_DIR}/onlyQc"
 
-# Merge remove lists, skipping missing files
-REMOVE_ARGS=""
+# Merge remove lists into one (skip missing/empty)
+: > "$MERGED_REMOVE"
 for f in "$REMOVE_FILE" "$CONTROLS_FILE"; do
     if [ -s "$f" ]; then
-        REMOVE_ARGS="${REMOVE_ARGS} --remove $f"
+        cat "$f" >> "$MERGED_REMOVE"
     fi
 done
 
-if [ -z "$REMOVE_ARGS" ]; then
+if [ ! -s "$MERGED_REMOVE" ]; then
     echo "  No remove files found — copying HBCD_remapped.fam as onlyQc.fam"
     cp "${DATA_DIR}/HBCD_remapped.fam" "${OUT_PREFIX}.fam"
+    rm -f "$MERGED_REMOVE"
     exit 0
 fi
 
-# shellcheck disable=SC2086
 plink2 \
     --bfile "${HST_DIR}/HBCD/HBCD" \
     --allow-extra-chr \
     --fam "${DATA_DIR}/HBCD_remapped.fam" \
-    $REMOVE_ARGS \
+    --remove "$MERGED_REMOVE" \
     --make-bed \
     --out "$OUT_PREFIX"
+
+rm -f "$MERGED_REMOVE"
