@@ -1,0 +1,14 @@
+name: hbcd-release
+channels:
+  - bioconda
+  - conda-forge
+  - nodefaults
+dependencies:
+  - r-base >=4.4
+  - r-matrix
+  - bioconductor-snprelate
+  - bioconductor-gdsfmt
+  - bioconductor-seqarray
+  - bioconductor-seqvartools
+  - bioconductor-genesis
+  - bioconductor-biocparallel
