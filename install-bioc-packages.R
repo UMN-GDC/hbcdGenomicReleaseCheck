@@ -1,7 +1,12 @@
 #!/usr/bin/env Rscript
-# Install Bioconductor packages for the HBCD release pipeline.
-# Run after: conda env create -f environment.yaml && conda activate hbcd-release
-# Usage:   Rscript install-bioc-packages.R
+# Install R packages for the HBCD release pipeline.
+#
+# Two usage modes:
+#   1) Conda-based:  conda activate hbcd-release && Rscript install-bioc-packages.R
+#   2) HPC-module:   module load R/4.4.2-openblas-rocky8 && Rscript install-bioc-packages.R
+#
+# Packages are installed to the personal/site R library.
+# BiocManager auto-selects the correct Bioconductor version for the R version.
 
 pkgs <- c(
     "Matrix",

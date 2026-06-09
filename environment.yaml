@@ -1,6 +1,0 @@
-name: hbcd-release
-channels:
-  - conda-forge
-dependencies:
-  - r-base
-  - r-biocmanager

@@ -35,25 +35,22 @@ RELEASE_BASE = get_release_base()
 # ── helpers ────────────────────────────────────────────────────────────
 
 def rc_to_iids(rc_set):
-    """Expand a set of release_candids to IID level (both C and M)."""
     return {f"{int(rc)}C" for rc in rc_set} | {f"{int(rc)}M" for rc in rc_set}
 
 
 def _try_csv(path, **kwargs):
-    """Read a CSV if it exists, else return None."""
     if path.exists():
         return pd.read_csv(path, **kwargs)
     return None
 
 
-# ── load identifiers & reference sets ──────────────────────────────────
+# ── Load identifiers & reference sets ──────────────────────────────────
 
 identifiers = load_identifiers()
 par_candids = load_par_visit_candids()
-exc_rc_excel = load_excluded_release_candids()      # Excel exclusion (RC-level)
-exc_pscids_csv = load_additional_excluded_pscids()   # HBCDexclusions.csv (pscid-level)
+exc_rc_excel = load_excluded_release_candids()
+exc_pscids_csv = load_additional_excluded_pscids()
 
-# Map CSV pscid exclusions → release_candid
 exc_rc_csv = set(
     identifiers.loc[identifiers["pscid"].isin(exc_pscids_csv), "release_candid"]
     .dropna().astype(int).unique()
@@ -61,10 +58,10 @@ exc_rc_csv = set(
 
 all_exc_rc = exc_rc_excel | exc_rc_csv
 all_exc_iids = rc_to_iids(all_exc_rc)
+par_iids = rc_to_iids(par_candids)
 
-# ── Pipeline stage data ────────────────────────────────────────────────
+# ── Stage 1 — Raw cohort → onlyQc (QC filter) ─────────────────────────
 
-# Stage 1 — Raw HBCD cohort (from July2025 transfer)
 raw_fam = _try_csv(
     DATA_DIR / ".." / "HST_HBCD_Transfer_July2025" / "HBCD_analysis" / "hbcd.fam",
     sep=r"\s+", header=None,
@@ -76,14 +73,12 @@ if raw_fam is not None:
     raw_fam["pscid"] = raw_fam["iid_part"].str[:-1]
     raw_pscids = set(raw_fam["pscid"].dropna())
 
-# Map raw pscids → release_candid via identifiers
 raw_rc = set(
     identifiers.loc[identifiers["pscid"].isin(raw_pscids), "release_candid"]
     .dropna().astype(int).unique()
 ) if raw_pscids else set()
 raw_iids = rc_to_iids(raw_rc)
 
-# Stage 2 — QC-passing cohort (onlyQc, after steps 01-02)
 onlyqc_fam = _try_csv(
     DATA_DIR / "onlyQc.fam",
     sep=r"\s+", header=None,
@@ -91,14 +86,17 @@ onlyqc_fam = _try_csv(
 )
 onlyqc_rc = set()
 if onlyqc_fam is not None:
-    # onlyQc IIDs are release_candid-based (from step 01 remapping)
     onlyqc_rc = set(
         pd.to_numeric(onlyqc_fam["IID"].astype(str).str[:-1], errors="coerce")
         .dropna().astype(int).unique()
     )
 onlyqc_iids = rc_to_iids(onlyqc_rc)
 
-# Stage 3 — Release cohort (hbcd, after steps 25-27)
+qc_removed_rc = raw_rc - onlyqc_rc
+qc_removed_iids = rc_to_iids(qc_removed_rc)
+
+# ── Stage 2 — onlyQc → release (exclusion filter) ─────────────────────
+
 release_fam = _try_csv(
     RELEASE_DIR / "hbcd.fam",
     sep=r"\s+", header=None,
@@ -112,11 +110,10 @@ if release_fam is not None:
     )
 release_iids = rc_to_iids(release_rc)
 
-# QC-removed = raw_rc - onlyqc_rc
-qc_removed_rc = raw_rc - onlyqc_rc
-qc_removed_iids = rc_to_iids(qc_removed_rc)
+excluded_from_release_rc = onlyqc_rc - release_rc
+excluded_from_release_iids = rc_to_iids(excluded_from_release_rc)
 
-# ── Exclusion list data (for Venn panels) ──────────────────────────────
+# ── Exclusion list data ────────────────────────────────────────────────
 
 excl_csv = pd.read_csv(DATA_DIR / "HBCDexclusions.csv")
 excl_lists = {}
@@ -125,7 +122,6 @@ for col in excl_csv.columns:
     pscids = {p for p in pscids if p and p != "nan"}
     excl_lists[col] = pscids
 
-# Map each exclusion list to RC and IID
 excl_rc_lists = {}
 excl_iids_lists = {}
 for name, pscids in excl_lists.items():
@@ -139,32 +135,19 @@ for name, pscids in excl_lists.items():
 
 ```{python}
 #| label: cardinality-overview
-print("Pipeline Cascade (release_candid level)")
-print("═" * 60)
-print(f"  Raw HBCD cohort (July2025)      : {len(raw_rc):>6} RC")
-print(f"  └─ QC + control removed         : {len(qc_removed_rc):>6} RC")
-print(f"  onlyQc (derivatives base)       : {len(onlyqc_rc):>6} RC")
-print(f"  └─ excluded (excel + csv)       : {len(all_exc_rc):>6} RC")
-print(f"  Release set (hbcd.fam)          : {len(release_rc):>6} RC")
+print("=" * 65)
+print("  Two-Stage Filter Pipeline")
+print("=" * 65)
 print()
-
-print("Set sizes (IID level)")
-print("═" * 60)
-print(f"  Raw HBCD cohort                 : {len(raw_iids):>6}")
-print(f"  onlyQc                          : {len(onlyqc_iids):>6}")
-print(f"  Release (hbcd.fam)              : {len(release_iids):>6}")
-print(f"  par_visit                       : {len(rc_to_iids(par_candids)):>6}")
-print(f"  excluded (Excel)                : {len(rc_to_iids(exc_rc_excel)):>6}")
-print(f"  excluded (HBCDexclusions.csv)   : {len(exc_pscids_csv):>6} pscids")
-print(f"  → mapped to IID                 : {len(rc_to_iids(exc_rc_csv)):>6}")
-print(f"  combined exclusions (IID)       : {len(all_exc_iids):>6}")
+print(f"  Stage 1 — QC + control removal (steps 01-02)")
+print(f"    Raw cohort      : {len(raw_rc):>6} RC  ({len(raw_iids):>6} IID)")
+print(f"    └─ QC-removed   : {len(qc_removed_rc):>6} RC  ({len(qc_removed_iids):>6} IID)")
+print(f"    onlyQc (pass QC): {len(onlyqc_rc):>6} RC  ({len(onlyqc_iids):>6} IID)  ←  derivatives base")
 print()
-
-print("IID-level pairwise overlaps (release set)")
-print("═" * 60)
-print(f"  onlyQc ∩ par_visit              : {len(onlyqc_iids & rc_to_iids(par_candids)):>6}")
-print(f"  onlyQc ∩ release                : {len(onlyqc_iids & release_iids):>6}")
-print(f"  par_visit ∩ release             : {len(rc_to_iids(par_candids) & release_iids):>6}")
+print(f"  Stage 2 — Exclusion removal (steps 25-29)")
+print(f"    onlyQc          : {len(onlyqc_rc):>6} RC  ({len(onlyqc_iids):>6} IID)")
+print(f"    └─ excluded     : {len(excluded_from_release_rc):>6} RC  ({len(excluded_from_release_iids):>6} IID)")
+print(f"    Release (hbcd)  : {len(release_rc):>6} RC  ({len(release_iids):>6} IID)  ←  final output")
 ```
 
 ---
@@ -172,35 +155,45 @@ print(f"  par_visit ∩ release             : {len(rc_to_iids(par_candids) & rel
 ## Pipeline Concept
 
 ```
-  Raw HBCD cohort (1752 IIDs)
-         │
-         ▼  ─── Step 01-02: QC + control removal ───
-         │
-    ┌──── onlyQc ────┐  ←─ derivatives base (GRM, PCA, PC-Relate)
-    │                  │
-    │    Steps 03-24   │  Derivatives computed on FULL onlyQc set
-    │  (GCTA/PLINK    │
-    │   GRM, PC-AiR,  │
-    │   PC-Relate,    │
-    │   imputation)   │
-    │                  │
-    └────────┬─────────┘
-             │
-             ▼  ─── Step 25-27: par_visit + exclusion filtering ───
-             │
-          release ───► Step 28-29: subset derivatives to release
-         (hbcd)                    subjects only
+                    ┌──────────────────────────────────┐
+                    │          Raw HBCD cohort          │
+                    │     (July2025 transfer)           │
+                    └────────────┬─────────────────────┘
+                                 │
+                    ╔════════════╧════════════╗
+                    ║    FILTER 1: QC +       ║
+                    ║    control removal       ║  steps 01-02
+                    ╚════════════╤════════════╝
+                                 │
+                    ┌────────────┴─────────────┐
+                    │         onlyQc            │
+                    │  (derivatives computed    │
+                    │   on this full set)       │
+                    │  GRM · PCA · PC-Relate   │
+                    │  Imputation               │
+                    └────────────┬─────────────┘
+                                 │
+                    ╔════════════╧════════════╗
+                    ║    FILTER 2: Exclusions  ║
+                    ║    (par_visit +          ║  steps 25-29
+                    ║     exclusion lists)     ║
+                    ╚════════════╤════════════╝
+                                 │
+                    ┌────────────┴─────────────┐
+                    │   release (hbcd.fam)      │
+                    │   + subsetted derivatives │
+                    └──────────────────────────┘
 ```
 
 ---
 
-## Panel A: QC Filtering
+## Panel A: Filter 1 — QC Removal
 
-How many subjects are removed by genomics QC and control filtering?
+What gets removed at the genomics QC + control filter stage?
 
 ```{python}
 #| label: venn-qc-removal
-#| fig-cap: "QC removal: raw HBCD cohort vs onlyQc (IID level)"
+#| fig-cap: "Filter 1: raw HBCD cohort vs QC-passing subjects (IID level)"
 if HAS_VENN:
     fig, ax = plt.subplots(figsize=(6, 6))
     v = venn2(
@@ -213,7 +206,7 @@ if HAS_VENN:
         set_colors=["#1f78b4", "#33a02c"],
         ax=ax,
     )
-    ax.set_title("QC + Control Removal (IID level)", fontsize=13)
+    ax.set_title("Filter 1: QC + Control Removal (IID level)", fontsize=13)
     from matplotlib.patches import Patch
     ax.legend(
         handles=[
@@ -225,155 +218,107 @@ if HAS_VENN:
     plt.tight_layout()
     plt.show()
 else:
-    print("matplotlib-venn not available — skipping Venn diagram")
+    print("matplotlib-venn not available")
 ```
 
 ---
 
-## Panel B: Release Filtering
+## Panel B: Filter 2 — Exclusion Removal
 
-From `onlyQc` to the release set: par_visit + exclusion filtering.
+From `onlyQc` to the final release: what gets removed by the exclusion lists?
 
 ```{python}
-#| label: venn-release-filter
-#| fig-cap: "Release filtering: onlyQc ∩ par_visit minus exclusions (IID level)"
+#| label: venn-exclusion-removal
+#| fig-cap: "Filter 2: onlyQc vs excluded IIDs vs final release (IID level)"
 if HAS_VENN:
-    par_iids = rc_to_iids(par_candids)
     subsets = (
-        len(onlyqc_iids - par_iids - all_exc_iids),
-        len(par_iids - onlyqc_iids - all_exc_iids),
-        len((onlyqc_iids & par_iids) - all_exc_iids),
-        len(all_exc_iids - onlyqc_iids - par_iids),
-        len((onlyqc_iids & all_exc_iids) - par_iids),
-        len((par_iids & all_exc_iids) - onlyqc_iids),
-        len(onlyqc_iids & par_iids & all_exc_iids),
+        len(onlyqc_iids - all_exc_iids - release_iids),
+        len(all_exc_iids - onlyqc_iids - release_iids),
+        len((onlyqc_iids & all_exc_iids) - release_iids),
+        len(release_iids - onlyqc_iids - all_exc_iids),
+        len((onlyqc_iids & release_iids) - all_exc_iids),
+        len((all_exc_iids & release_iids) - onlyqc_iids),
+        len(onlyqc_iids & all_exc_iids & release_iids),
     )
 
     fig, ax = plt.subplots(figsize=(7, 7))
     v = venn3(
         subsets,
-        set_labels=("onlyQc", "par_visit", "Excluded (IID)"),
-        set_colors=["#33a02c", "#1f78b4", "#ff7f00"],
+        set_labels=("onlyQc", "Excluded (IID)", "Release (hbcd)"),
+        set_colors=["#33a02c", "#ff7f00", "#1f78b4"],
         ax=ax,
     )
-    ax.set_title("Release Filter (IID level)", fontsize=13)
+    ax.set_title("Filter 2: Exclusion Removal (IID level)", fontsize=13)
     from matplotlib.patches import Patch
     ax.legend(
         handles=[
             Patch(facecolor="#33a02c", alpha=0.5, label=f"onlyQc ({len(onlyqc_iids)})"),
-            Patch(facecolor="#1f78b4", alpha=0.5, label=f"par_visit ({len(par_iids)})"),
             Patch(facecolor="#ff7f00", alpha=0.5, label=f"Excluded ({len(all_exc_iids)})"),
+            Patch(facecolor="#1f78b4", alpha=0.5, label=f"Release ({len(release_iids)})"),
         ],
         loc="lower left", fontsize=9,
     )
     plt.tight_layout()
     plt.show()
 else:
-    print("matplotlib-venn not available — skipping Venn diagram")
+    print("matplotlib-venn not available")
 ```
 
-**Interpretation**: The release set is `onlyQc ∩ par_visit` minus exclusions
-(region in the centre of the Venn with onlyQc + par_visit, not in Excluded).
-
 ```{python}
-#| label: release-count
-print("Release subject derivation:")
-print(f"  onlyQc subjects         : {len(onlyqc_iids):>6}")
-print(f"  in par_visit            : {len(onlyqc_iids & par_iids):>6}")
-print(f"    minus exclusions      : {len((onlyqc_iids & par_iids) - all_exc_iids):>6}")
-print(f"  actual release IIDs     : {len(release_iids):>6}")
+#| label: exclusion-count
+print("What gets excluded from onlyQc to produce the release:")
+print(f"  onlyQc IIDs                      : {len(onlyqc_iids):>6}")
+print(f"  in exclusion lists               : {len(all_exc_iids):>6}")
+print(f"  actually removed from onlyQc     : {len(excluded_from_release_iids):>6}")
+print(f"  Release IIDs                     : {len(release_iids):>6}")
+print()
+onlyqc_par = onlyqc_iids & par_iids
+onlyqc_exc = onlyqc_iids & all_exc_iids
+print("Breakdown of onlyQc subjects:")
+print(f"  in par_visit AND not excluded    : {len(onlyqc_par - all_exc_iids):>6}  ← expected release")
+print(f"  in par_visit but ALSO excluded   : {len(onlyqc_par & all_exc_iids):>6}  (blocked by exclusion)")
+print(f"  NOT in par_visit                 : {len(onlyqc_iids - par_iids):>6}  (no completed visit)")
 ```
 
 ---
 
-## Panel C: Exclusion Overlap
+## Panel C: What Was Excluded
 
-How many release_candids are shared across the three exclusion criteria?
-
-```{python}
-#| label: venn-exclusion-overlap
-#| fig-cap: "RC-level overlap between the three exclusion sources"
-if HAS_VENN and len(excl_lists) >= 3:
-    lists_names = list(excl_lists.keys())[:3]
-    s0 = excl_rc_lists[lists_names[0]]
-    s1 = excl_rc_lists[lists_names[1]]
-    s2 = excl_rc_lists[lists_names[2]]
-
-    subsets = (
-        len(s0 - s1 - s2),
-        len(s1 - s0 - s2),
-        len((s0 & s1) - s2),
-        len(s2 - s0 - s1),
-        len((s0 & s2) - s1),
-        len((s1 & s2) - s0),
-        len(s0 & s1 & s2),
-    )
-
-    fig, ax = plt.subplots(figsize=(7, 7))
-    v = venn3(
-        subsets,
-        set_labels=[n.split(":")[0] for n in lists_names],
-        set_colors=["#1f78b4", "#e31a1c", "#33a02c"],
-        ax=ax,
-    )
-    ax.set_title("Exclusion source overlap (release_candid)", fontsize=13)
-    from matplotlib.patches import Patch
-    handles = [
-        Patch(facecolor=c, alpha=0.5, label=f"{n} ({len(excl_rc_lists[n])})")
-        for n, c in zip(lists_names, ["#1f78b4", "#e31a1c", "#33a02c"])
-    ]
-    ax.legend(handles=handles, loc="lower left", fontsize=8)
-    plt.tight_layout()
-    plt.show()
-elif HAS_VENN:
-    print(f"Need 3 exclusion lists, found {len(excl_lists)}")
-else:
-    print("matplotlib-venn not available — skipping Venn diagram")
-```
+Breakdown of each exclusion source and how many release_candids they would have removed.
 
 ```{python}
 #| label: exclusion-table
-print("Exclusion reason breakdown (release_candid level)")
-print(f"{'Reason':<40} {'RCs':>6} {'in onlyQc':>9} {'in release':>10}")
-print("─" * 68)
+print(f"{'Exclusion source':<45} {'RCs':>6}  {'in onlyQc':>9}  {'removed':>8}")
+print("─" * 72)
 for name, rc_set in sorted(excl_rc_lists.items(), key=lambda x: -len(x[1])):
     in_onlyqc = len(rc_set & onlyqc_rc)
-    in_release = len(rc_set & release_rc)
-    status = "OVERLAP" if in_release else "OK"
-    print(f"  [{status:>7}] {name:<28} {len(rc_set):>6} {in_onlyqc:>9} {in_release:>10}")
+    removed = len(rc_set & excluded_from_release_rc)
+    print(f"  {name:<43} {len(rc_set):>6}  {in_onlyqc:>9}  {removed:>8}")
 print()
 
-total_excel = len(exc_rc_excel)
-total_csv = len(exc_rc_csv)
-total = len(all_exc_rc)
-in_onlyqc = len(all_exc_rc & onlyqc_rc)
-in_release = len(all_exc_rc & release_rc)
-print(f"  {'TOTAL (combined)':<40} {total:>6} {in_onlyqc:>9} {in_release:>10}")
+# Combined totals
+lines = [
+    ("Excel exclusion list", exc_rc_excel),
+    ("HBCDexclusions.csv", exc_rc_csv),
+    ("Combined", all_exc_rc),
+]
+for label, rc_set in lines:
+    in_onlyqc = len(rc_set & onlyqc_rc)
+    removed = len(rc_set & excluded_from_release_rc)
+    print(f"  {label:<43} {len(rc_set):>6}  {in_onlyqc:>9}  {removed:>8}")
 ```
 
 ---
 
-## Panel D: Pipeline Cascade Summary
-
-Number of release_candids at each stage of the pipeline.
-
 ```{python}
-#| label: cascade-table
-print(f"{'Stage':<55} {'Subjects':>8}  {'Note'}")
-print("─" * 80)
-print(f"  1. Raw HBCD cohort                                {len(raw_rc):>8}  July2025 transfer")
-print(f"  2. QC + control removed                           {len(qc_removed_rc):>8}  steps 01-02")
-print(f"  3. onlyQc (derivatives base)                      {len(onlyqc_rc):>8}  GRM, PCA, PC-Relate, imputation")
-print(f"  4. par_visit intersection                          {len(onlyqc_rc & par_candids):>8}  subjects in completed visits")
-print(f"  5. Exclusion lists removed                        {len(all_exc_rc):>8}  Excel + HBCDexclusions.csv")
-print(f"  6. Release (hbcd.fam)                             {len(release_rc):>8}  final filtered set")
-```
-
-```{python}
-#| label: derivative-scope
-print("Derivative computation scope")
-print("═" * 60)
-print(f"  onlyQc subjects  : {len(onlyqc_rc)}  (derivatives computed on this full set)")
-print(f"  Release subjects : {len(release_rc)}  (derivatives subsetted to this set)")
-print(f"  Ratio            : {len(release_rc)/max(len(onlyqc_rc),1):.1%} retained after release filter")
+#| label: cascade-summary
+print(f"{'Stage':<55} {'RCs':>6}  {'IIDs':>6}  {'Note'}")
+print("─" * 75)
+print(f"  1. Raw HBCD cohort                        {len(raw_rc):>6}  {len(raw_iids):>6}  July2025 transfer")
+print(f"     └─ QC-removed                          {len(qc_removed_rc):>6}  {len(qc_removed_iids):>6}  steps 01-02")
+print(f"  2. onlyQc (derivatives base)              {len(onlyqc_rc):>6}  {len(onlyqc_iids):>6}  GRM · PCA · PC-Relate · imputation")
+print(f"     └─ excluded from release               {len(excluded_from_release_rc):>6}  {len(excluded_from_release_iids):>6}  steps 25-27")
+print(f"  3. Release (hbcd.fam)                     {len(release_rc):>6}  {len(release_iids):>6}  final output")
+print()
+print(f"  Derivatives scope: {len(onlyqc_rc)} subjects → {len(release_rc)} subjects ({len(release_rc)/max(len(onlyqc_rc),1):.1%} retained)")
 ```
