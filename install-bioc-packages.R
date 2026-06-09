@@ -4,6 +4,7 @@
 # Usage:   Rscript install-bioc-packages.R
 
 pkgs <- c(
+    "Matrix",
     "SNPRelate",
     "SeqArray",
     "SeqVarTools",
@@ -15,7 +16,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) {
     install.packages("BiocManager", repos = "https://cran.r-project.org")
 }
 
-BiocManager::install(pkgs, ask = FALSE, update = TRUE)
+BiocManager::install(pkgs, ask = FALSE, update = TRUE, Ncpus = 4)
 
 for (pkg in pkgs) {
     if (!requireNamespace(pkg, quietly = TRUE)) {
