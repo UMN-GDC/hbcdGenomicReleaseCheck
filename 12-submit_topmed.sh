@@ -3,7 +3,7 @@ set -euo pipefail
 
 # step 15: submit VCF chunks to TOPMed Imputation Server (autosomes)
 
-OUTDIR="/scratch.global/GDC/hbcdGenomicsPreImputation/data"
+OUTDIR="/home/ood-coffm049/hbcdData/data"
 BASE_URL="https://imputation.biodatacatalyst.nhlbi.nih.gov/api/v2"
 
 TIS_TOKEN=$(cat ~/topmedKey)
@@ -13,7 +13,9 @@ if [ -z "$TIS_TOKEN" ]; then
 fi
 
 CHUNKS=(
-    "16,17,18,19,20,21,22"
+    "1,2,3,4,5,6,7"
+    "8,9,10,11,12,13,14"
+    "15,16,17,18,19,20,21,22,X"
 )
 
 for i in "${!CHUNKS[@]}"; do

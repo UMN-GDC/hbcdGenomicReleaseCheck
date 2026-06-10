@@ -13,9 +13,10 @@ module load bcftools
 
 set -euo pipefail
 
-DATA_DIR=/projects/standard/basu_hbcd/shared/data
+DATA_DIR=/home/ood-coffm049/hbcdData
 PREFIX="${DATA_DIR}/onlyQc"
-OUTDIR="/scratch.global/GDC/hbcdGenomicsPreImputation/data"
+OUTDIR="/home/ood-coffm049/hbcdData/data"
+mkdir -p $OUTDIR
 
 echo "--- Processing chrX ---"
 
