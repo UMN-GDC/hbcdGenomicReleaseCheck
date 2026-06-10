@@ -4,6 +4,7 @@
 # source /projects/standard/basu_hbcd/shared/.venv/bin/activate
 
 import re
+from pathlib import Path
 
 import pandas as pd
 
@@ -55,6 +56,24 @@ controls[["FID", "IID_final"]].to_csv(
     index=False,
     header=False,
 )
+
+# -- identify QC failures from xlsx --
+qc_xlsx = pd.read_excel(
+    Path("../data/HBCD_genetics_QC1_missing_race_LORIS.xlsx"),
+    sheet_name="Exclude_Summary",
+)
+qc_raw = qc_xlsx["Study_ID"].dropna().astype(str).str.strip()
+qc_df = qc_raw.str.extract(r"(?P<pscid>.+)(?P<rel>[CM])$")
+qc_df = qc_df.merge(
+    identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
+    on="pscid", how="inner",
+)
+qc_iids = qc_df["release_candid"].astype(int).astype(str) + qc_df["rel"]
+qc = fam.loc[fam["IID_final"].isin(qc_iids), ["FID", "IID_final"]]
+qc.to_csv(str(DATA_DIR / "QC_removed.txt"), sep=" ", index=False, header=False)
+
+print(f"  QC failures (xlsx)     : {len(qc)}")
+print(f"  Written: {DATA_DIR}/QC_removed.txt")
 
 fam[["FID", "IID_final", "PAT", "MAT", "Sex", "Pheno"]].to_csv(
     str(DATA_DIR / "HBCD_remapped.fam"),

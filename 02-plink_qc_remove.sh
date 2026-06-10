@@ -8,7 +8,7 @@ module load plink/2.00-alpha-091019
 
 HST_DIR=/projects/standard/basu_hbcd/shared/HST_HBCD_Transfer_July2025
 DATA_DIR=/projects/standard/basu_hbcd/shared/data
-REMOVE_FILE="${DATA_DIR}/Remove.txt"
+REMOVE_FILE="${DATA_DIR}/QC_removed.txt"
 CONTROLS_FILE="${DATA_DIR}/Removed_controls.txt"
 MERGED_REMOVE="${DATA_DIR}/_merged_remove.txt"
 OUT_PREFIX="${DATA_DIR}/onlyQc"
