@@ -51,33 +51,18 @@ remapped_fam = _try_csv(
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
 
-if remapped_fam is not None:
-    remapped_ids = set(remapped_fam["IID"])
-    controls_file = _try_csv(
-        DATA_DIR / "Removed_controls.txt",
-        sep=r"\s+", header=None,
-        names=["FID", "IID"],
-    )
-    control_ids = set(controls_file["IID"]) if controls_file is not None else set()
-else:
-    # Fallback: raw hbcd.fam from transfer dir (RC-level only, no controls)
-    raw_fam = _try_csv(
-        DATA_DIR / ".." / "HST_HBCD_Transfer_July2025" / "HBCD_analysis" / "hbcd.fam",
-        sep=r"\s+", header=None,
-        names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
-    )
-    raw_pscids = set()
-    if raw_fam is not None:
-        raw_fam["iid_part"] = raw_fam["IID"].astype(str).str.split("_").str[2]
-        raw_fam["pscid"] = raw_fam["iid_part"].str[:-1]
-        raw_pscids = set(raw_fam["pscid"].dropna())
-    raw_rc = set(
-        identifiers.loc[identifiers["pscid"].isin(raw_pscids), "release_candid"]
-        .dropna().astype(int).unique()
-    ) if raw_pscids else set()
-    remapped_ids = rc_to_iids(raw_rc)
-    control_ids = set()
-
+remapped_ids = set(remapped_fam["IID"])
+controls_file = _try_csv(
+    DATA_DIR / "Removed_controls.txt",
+    sep=r"\s+", header=None,
+    names=["FID", "IID"],
+)
+control_ids = set(controls_file["IID"]) if controls_file is not None else set()
+removed = set(_try_csv(
+    DATA_DIR / "Removed_individuals2.txt",
+    sep=r"\s+", header=None,
+    names=["IID"],
+)["IID"])
 
 # ── onlyQc (QC-passing) ────────────────────────────────────────────────
 
@@ -88,7 +73,7 @@ onlyqc_fam = _try_csv(
 )
 onlyqc_ids = set(onlyqc_fam["IID"])
 
-qc_fail_ids = remapped_ids - control_ids - onlyqc_ids
+qc_fail_ids = remapped_ids - control_ids - removed
 
 
 # ── Exclusion lists ────────────────────────────────────────────────────
