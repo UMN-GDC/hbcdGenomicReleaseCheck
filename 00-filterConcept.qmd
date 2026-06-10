@@ -11,6 +11,8 @@ format:
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from matplotlib_venn import venn2, venn3
+import matplotlib.pyplot as plt
 
 from _lib import (
     DATA_DIR,
@@ -18,24 +20,11 @@ from _lib import (
     load_additional_excluded_pscids,
 )
 
-try:
-    from matplotlib_venn import venn2, venn3
-    import matplotlib.pyplot as plt
-    HAS_VENN = True
-except ImportError:
-    HAS_VENN = False
-
 
 # ── helpers ────────────────────────────────────────────────────────────
 
 def rc_to_iids(rc_set):
     return {f"{int(rc)}C" for rc in rc_set} | {f"{int(rc)}M" for rc in rc_set}
-
-
-def _try_csv(path, **kwargs):
-    if path.exists():
-        return pd.read_csv(path, **kwargs)
-    return None
 
 
 # ── Load identifiers ───────────────────────────────────────────────────
@@ -45,35 +34,27 @@ identifiers = load_identifiers()
 
 # ── Remapped cohort (all IIDs before QC/control filtering) ────────────
 
-remapped_fam = _try_csv(
+remapped_fam = pd.read_csv(
     DATA_DIR / "HBCD_remapped.fam",
     sep=r"\s+", header=None,
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
-
 remapped_ids = set(remapped_fam["IID"])
-controls_file = _try_csv(
+
+controls_file = pd.read_csv(
     DATA_DIR / "Removed_controls.txt",
     sep=r"\s+", header=None,
     names=["FID", "IID"],
 )
-control_ids = set(controls_file["IID"]) if controls_file is not None else set()
-removed = set(_try_csv(
-    DATA_DIR / "Removed_individuals2.txt",
-    sep=r"\s+", header=None,
-    names=["IID"],
-)["IID"])
+control_ids = set(controls_file["IID"])
 
-# ── onlyQc (QC-passing) ────────────────────────────────────────────────
-
-onlyqc_fam = _try_csv(
-    DATA_DIR / "onlyQc.fam",
-    sep=r"\s+", header=None,
-    names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
+qc_fails = pd.read_excel(
+    Path("../data/Loris.xlsx"),
+    sheet_name="cool sheet",
 )
-onlyqc_ids = set(onlyqc_fam["IID"])
+qc_fail_ids = set(qc_fails["iid"].dropna().astype(str).str.strip())
 
-qc_fail_ids = remapped_ids - control_ids - removed
+onlyqc_ids = remapped_ids - qc_fail_ids - control_ids
 
 
 # ── Exclusion lists ────────────────────────────────────────────────────
@@ -92,14 +73,12 @@ for col in excl_csv.columns:
     pscids = {p for p in pscids if p and p != "nan"}
     excl_lists[col] = pscids
 
-excl_rc_lists = {}
 excl_iids_lists = {}
 for name, pscids in excl_lists.items():
     rc_set = set(
         identifiers.loc[identifiers["pscid"].isin(pscids), "release_candid"]
         .dropna().astype(int).unique()
     )
-    excl_rc_lists[name] = rc_set
     excl_iids_lists[name] = rc_to_iids(rc_set)
 
 all_exc_iids = set()
@@ -109,13 +88,12 @@ for s in excl_iids_lists.values():
 
 ---
 
-## Panel A: QC Filter — Raw vs onlyQc
+## Panel A: QC Filter — Total vs onlyQc
 
 What gets removed by genomics QC and control filtering?
 
 ```{python}
 #| label: cardinality-a
-n_removed = len(remapped_ids - onlyqc_ids)
 n_controls = len(control_ids & remapped_ids)
 n_qc = len(qc_fail_ids)
 print(f"  Total (remapped)      : {len(remapped_ids):>6} IID")
