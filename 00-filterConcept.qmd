@@ -47,11 +47,12 @@ controls_file = pd.read_csv(
     names=["FID", "IID"],
 )
 control_ids = set(controls_file["IID"])
-
+# xls = pd.ExcelFile("../data/HBCD_genetics_QC1_missing_race_LORIS.xlsx")
+# sheets = xls.sheet_names
 qc_fails = pd.read_excel(
-    Path("../data/Loris.xlsx"),
-    sheet_name="cool sheet",
-)
+    Path("../data/HBCD_genetics_QC1_missing_race_LORIS.xlsx"),
+    sheet_name="Exclude_Summary",
+)["Study_ID"]
 qc_fail_ids = set(qc_fails["iid"].dropna().astype(str).str.strip())
 
 onlyqc_ids = remapped_ids - qc_fail_ids - control_ids
