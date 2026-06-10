@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 # step 9: PC-AiR pipeline for hbcd_rsid_harmonized
 # Uses existing KING output from relatedness step
+# module load R/4.4.2-openblas-rocky8
 
 library(SNPRelate)
 library(gdsfmt)

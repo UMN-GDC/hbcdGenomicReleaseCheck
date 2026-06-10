@@ -8,6 +8,8 @@
 # Packages are installed to the personal/site R library.
 # BiocManager auto-selects the correct Bioconductor version for the R version.
 
+# module load R/4.4.2-openblas-rocky8
+
 pkgs <- c(
     "Matrix",
     "SNPRelate",
