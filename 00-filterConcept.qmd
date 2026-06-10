@@ -50,10 +50,16 @@ control_ids = set(controls_file["IID"])
 # xls = pd.ExcelFile("../data/HBCD_genetics_QC1_missing_race_LORIS.xlsx")
 # sheets = xls.sheet_names
 qc_fails = pd.read_excel(
-    Path("../data/HBCD_genetics_QC1_missing_race_LORIS.xlsx"),
-    sheet_name="Exclude_Summary",
-)["Study_ID"]
-qc_fail_ids = set(qc_fails["iid"].dropna().astype(str).str.strip())
+    Path("../data/Loris.xlsx"),
+    sheet_name="cool sheet",
+)
+qc_raw = qc_fails["iid"].dropna().astype(str).str.strip()
+qc_df = qc_raw.str.extract(r"(?P<pscid>.+)(?P<rel>[CM])$")
+qc_df = qc_df.merge(
+    identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
+    on="pscid", how="inner",
+)
+qc_fail_ids = set(qc_df["release_candid"].astype(int).astype(str) + qc_df["rel"])
 
 onlyqc_ids = remapped_ids - qc_fail_ids - control_ids
 
