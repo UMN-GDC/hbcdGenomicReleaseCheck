@@ -43,24 +43,40 @@ def _try_csv(path, **kwargs):
 identifiers = load_identifiers()
 
 
-# ── Raw cohort (July2025 transfer) ─────────────────────────────────────
+# ── Remapped cohort (all IIDs before QC/control filtering) ────────────
 
-raw_fam = _try_csv(
-    DATA_DIR / ".." / "HST_HBCD_Transfer_July2025" / "HBCD_analysis" / "hbcd.fam",
+remapped_fam = _try_csv(
+    DATA_DIR / "HBCD_remapped.fam",
     sep=r"\s+", header=None,
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
-raw_pscids = set()
-if raw_fam is not None:
-    raw_fam["iid_part"] = raw_fam["IID"].astype(str).str.split("_").str[2]
-    raw_fam["pscid"] = raw_fam["iid_part"].str[:-1]
-    raw_pscids = set(raw_fam["pscid"].dropna())
 
-raw_rc = set(
-    identifiers.loc[identifiers["pscid"].isin(raw_pscids), "release_candid"]
-    .dropna().astype(int).unique()
-) if raw_pscids else set()
-raw_iids = rc_to_iids(raw_rc)
+if remapped_fam is not None:
+    remapped_ids = set(remapped_fam["IID"])
+    controls_file = _try_csv(
+        DATA_DIR / "Removed_controls.txt",
+        sep=r"\s+", header=None,
+        names=["FID", "IID"],
+    )
+    control_ids = set(controls_file["IID"]) if controls_file is not None else set()
+else:
+    # Fallback: raw hbcd.fam from transfer dir (RC-level only, no controls)
+    raw_fam = _try_csv(
+        DATA_DIR / ".." / "HST_HBCD_Transfer_July2025" / "HBCD_analysis" / "hbcd.fam",
+        sep=r"\s+", header=None,
+        names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
+    )
+    raw_pscids = set()
+    if raw_fam is not None:
+        raw_fam["iid_part"] = raw_fam["IID"].astype(str).str.split("_").str[2]
+        raw_fam["pscid"] = raw_fam["iid_part"].str[:-1]
+        raw_pscids = set(raw_fam["pscid"].dropna())
+    raw_rc = set(
+        identifiers.loc[identifiers["pscid"].isin(raw_pscids), "release_candid"]
+        .dropna().astype(int).unique()
+    ) if raw_pscids else set()
+    remapped_ids = rc_to_iids(raw_rc)
+    control_ids = set()
 
 
 # ── onlyQc (QC-passing) ────────────────────────────────────────────────
@@ -72,7 +88,7 @@ onlyqc_fam = _try_csv(
 )
 onlyqc_ids = set(onlyqc_fam["IID"])
 
-qc_removed_ids = raw_iids - onlyqc_ids
+qc_fail_ids = remapped_ids - control_ids - onlyqc_ids
 
 
 # ── Exclusion lists ────────────────────────────────────────────────────
@@ -114,22 +130,26 @@ What gets removed by genomics QC and control filtering?
 
 ```{python}
 #| label: cardinality-a
-print(f"  Raw cohort         : {len(raw_iids):>6} IID")
-print(f"  QC-removed         : {len(qc_removed_ids):>6} IID")
-print(f"  onlyQc (QC-pass)   : {len(onlyqc_ids):>6} IID")
+n_removed = len(remapped_ids - onlyqc_ids)
+n_controls = len(control_ids & remapped_ids)
+n_qc = len(qc_fail_ids)
+print(f"  Total (remapped)      : {len(remapped_ids):>6} IID")
+print(f"  └─ Controls removed   : {n_controls:>6} IID")
+print(f"  └─ QC failures removed: {n_qc:>6} IID")
+print(f"  onlyQc (QC-pass)      : {len(onlyqc_ids):>6} IID")
 ```
 
 ```{python}
 #| label: venn-qc-removal
-#| fig-cap: "Raw HBCD cohort vs QC-passing subjects (IID level)"
+#| fig-cap: "Total remapped cohort vs QC-passing subjects (IID level)"
 fig, ax = plt.subplots(figsize=(6, 6))
 v = venn2(
     subsets=(
-        len(raw_iids - onlyqc_ids),
-        len(onlyqc_ids - raw_iids),
-        len(raw_iids & onlyqc_ids),
+        len(remapped_ids - onlyqc_ids),
+        len(onlyqc_ids - remapped_ids),
+        len(remapped_ids & onlyqc_ids),
     ),
-    set_labels=("Raw HBCD", "onlyQc (QC-pass)"),
+    set_labels=("Total (HBCD)", "onlyQc (QC-pass)"),
     set_colors=["#1f78b4", "#33a02c"],
     ax=ax,
 )
@@ -137,7 +157,7 @@ ax.set_title("QC + Control Removal (IID level)", fontsize=13)
 from matplotlib.patches import Patch
 ax.legend(
     handles=[
-        Patch(facecolor="#1f78b4", alpha=0.5, label=f"Raw ({len(raw_iids)})"),
+        Patch(facecolor="#1f78b4", alpha=0.5, label=f"Total ({len(remapped_ids)})"),
         Patch(facecolor="#33a02c", alpha=0.5, label=f"QC-pass ({len(onlyqc_ids)})"),
     ],
     loc="lower left", fontsize=9,
