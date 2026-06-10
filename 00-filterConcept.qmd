@@ -50,10 +50,10 @@ control_ids = set(controls_file["IID"])
 # xls = pd.ExcelFile("../data/HBCD_genetics_QC1_missing_race_LORIS.xlsx")
 # sheets = xls.sheet_names
 qc_fails = pd.read_excel(
-    Path("../data/Loris.xlsx"),
-    sheet_name="cool sheet",
+    Path("../data/HBCD_genetics_QC1_missing_race_LORIS.xlsx"),
+    sheet_name="Exclude_Summary",
 )
-qc_raw = qc_fails["iid"].dropna().astype(str).str.strip()
+qc_raw = qc_fails["Study_ID"].dropna().astype(str).str.strip()
 qc_df = qc_raw.str.extract(r"(?P<pscid>.+)(?P<rel>[CM])$")
 qc_df = qc_df.merge(
     identifiers[["pscid", "release_candid"]].drop_duplicates(subset="pscid"),
