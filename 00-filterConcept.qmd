@@ -121,9 +121,9 @@ What gets removed by genomics QC and control filtering?
 
 ```{python}
 #| label: cardinality-a
-print(f"  Raw cohort         : {len(raw_rc):>6} RC  ({len(raw_iids):>6} IID)")
-print(f"  QC-removed         : {len(qc_removed_rc):>6} RC  ({len(qc_removed_iids):>6} IID)")
-print(f"  onlyQc (QC-pass)   : {len(onlyqc_rc):>6} RC  ({len(onlyqc_iids):>6} IID)")
+print(f"  Raw cohort         : {len(raw_iids):>6} IID")
+print(f"  QC-removed         : {len(qc_removed_iids):>6} IID")
+print(f"  onlyQc (QC-pass)   : {len(onlyqc_iids):>6} IID")
 ```
 
 ```{python}
@@ -164,12 +164,12 @@ How do the individual exclusion sources overlap with each other?
 
 ```{python}
 #| label: venn-exclusion-overlap
-#| fig-cap: "Overlap between the three HBCDexclusions.csv columns (release_candid level)"
+#| fig-cap: "Overlap between the three HBCDexclusions.csv columns (IID level)"
 if HAS_VENN:
-    names = list(excl_rc_lists.keys())[:3]
-    s0 = excl_rc_lists[names[0]]
-    s1 = excl_rc_lists[names[1]]
-    s2 = excl_rc_lists[names[2]]
+    names = list(excl_iids_lists.keys())[:3]
+    s0 = excl_iids_lists[names[0]]
+    s1 = excl_iids_lists[names[1]]
+    s2 = excl_iids_lists[names[2]]
 
     subsets = (
         len(s0 - s1 - s2),
@@ -188,10 +188,10 @@ if HAS_VENN:
         set_colors=["#1f78b4", "#e31a1c", "#33a02c"],
         ax=ax,
     )
-    ax.set_title("Exclusion source overlap (release_candid)", fontsize=13)
+    ax.set_title("Exclusion source overlap (IID level)", fontsize=13)
     from matplotlib.patches import Patch
     handles = [
-        Patch(facecolor=c, alpha=0.5, label=f"{n} ({len(excl_rc_lists[n])})")
+        Patch(facecolor=c, alpha=0.5, label=f"{n} ({len(excl_iids_lists[n])})")
         for n, c in zip(names, ["#1f78b4", "#e31a1c", "#33a02c"])
     ]
     ax.legend(handles=handles, loc="lower left", fontsize=8)
@@ -203,20 +203,20 @@ else:
 
 ```{python}
 #| label: exclusion-table
-print(f"{'Column':<45} {'RCs':>6}  {'Unique to this':>14}")
+print(f"{'Column':<45} {'IIDs':>6}  {'Unique to this':>14}")
 print("─" * 68)
-for name, rc_set in sorted(excl_rc_lists.items(), key=lambda x: -len(x[1])):
+for name, iid_set in sorted(excl_iids_lists.items(), key=lambda x: -len(x[1])):
     others = set()
-    for n2, s2 in excl_rc_lists.items():
+    for n2, s2 in excl_iids_lists.items():
         if n2 != name:
             others |= s2
-    unique = len(rc_set - others)
-    print(f"  {name:<43} {len(rc_set):>6}  {unique:>14}")
+    unique = len(iid_set - others)
+    print(f"  {name:<43} {len(iid_set):>6}  {unique:>14}")
 print()
 all_combined = set()
-for s in excl_rc_lists.values():
+for s in excl_iids_lists.values():
     all_combined |= s
-print(f"  Combined unique RC count        : {len(all_combined):>6}")
+print(f"  Combined unique IID count       : {len(all_combined):>6}")
 ```
 
 ---
