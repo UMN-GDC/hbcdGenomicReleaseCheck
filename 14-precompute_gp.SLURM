@@ -17,10 +17,10 @@ module load rstudio/4.5.3
 
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
 chr="${CHROMS[$SLURM_ARRAY_TASK_ID]}"
-
+IMPDIR=/home/ood-coffm049/hbcdData/imputed
 ANCESTRY_FILE="/shared/release/hbcd/hbcd/rawdata/phenotype/sed_bm_demo.tsv"
-IMPUTED_DIRS=("imputed/c1" "imputed/c2" "imputed/c3" "imputed/cX")
-CACHE_DIR="gp_cache"
+IMPUTED_DIRS=($IMPDIR/c1 $IMPDIR/c2 $IMPDIR/c3)
+CACHE_DIR=$IMPDIR/gp_cache
 mkdir -p "$CACHE_DIR" logs
 
 VCF_FILE=$(find "${IMPUTED_DIRS[@]}" -name "chr${chr}.dose.vcf.gz" ! -name "*.tbi" 2>/dev/null | head -1)

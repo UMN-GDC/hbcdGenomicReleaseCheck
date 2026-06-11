@@ -7,7 +7,8 @@
 
 # step 17: download imputed results chunk 1 from TOPMed
 # Get the download link hash from the TopMed Server job results summary
+OUT=~/hbcdData/imputed
 
-mkdir -p imputed/c1
-cd imputed/c1
-curl -sL https://imputation.biodatacatalyst.nhlbi.nih.gov/get/woDH5ojmb2wA48E1C9TgnNM8nz5SUlUTzHt6Ccbu | bash
+mkdir -p ${OUT}/c1
+cd ${OUT}/c1
+curl -sL https://imputation.biodatacatalyst.nhlbi.nih.gov/get/3U8kWNE4ckhHHlP2elXdHaJ2a1Uv9bLksiPzfiRz | bash
