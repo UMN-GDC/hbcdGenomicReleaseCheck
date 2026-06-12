@@ -22,8 +22,9 @@
 set -euo pipefail
 
 module load bcftools
-module load rstudio/4.5.3
-source /projects/standard/basu_hbcd/shared/.venv/bin/activate
+
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate python  # default for Python (main pipeline)
 
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
 IMPDIR=/home/ood-coffm049/hbcdData/imputed
@@ -94,7 +95,7 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
 
     bcftools query -l "$FIRST_VCF" > "$CACHE_DIR/sample_order.txt"
 
-    Rscript --vanilla -e '
+    conda run -n R Rscript --vanilla -e '
         library(tidyverse, quietly = TRUE)
         samples <- read_lines("'"$CACHE_DIR/sample_order.txt"'")
         ancestry <- read_delim("'"$ANCESTRY_FILE"'",
@@ -155,7 +156,7 @@ OUT_RDS="$CACHE_DIR/chr${chr}${ANC:+_$ANC}.rds"
 
 if [ "$n_rare" -eq 0 ]; then
     echo "  No rare variants, saving empty RDS"
-    Rscript --vanilla -e '
+    conda run -n R Rscript --vanilla -e '
         saveRDS(list(sums = NULL, hist_bins = NULL, ridge = NULL, call_rate = NULL),
                 file = "'"$OUT_RDS"'")
     '
@@ -194,7 +195,7 @@ else
 fi
 
 # ── Assemble RDS ─────────────────────────────────────────────────────
-Rscript --vanilla -e '
+conda run -n R Rscript --vanilla -e '
     library(tidyverse, quietly = TRUE)
     td <- "'"$TMPDIR"'"
     per_sample <- tryCatch(
@@ -219,7 +220,7 @@ Rscript --vanilla -e '
 
 # ── Save INFO stats ──────────────────────────────────────────────────
 if [ -n "$INFO_FILE" ]; then
-    Rscript --vanilla -e '
+    conda run -n R Rscript --vanilla -e '
         library(tidyverse, quietly = TRUE)
         info <- read_tsv("'"$INFO_FILE"'", show_col_types = FALSE)
         if ("Rsq" %in% names(info) && "MAF" %in% names(info)) {
