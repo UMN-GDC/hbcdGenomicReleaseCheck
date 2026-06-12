@@ -7,7 +7,6 @@
 #SBATCH --output=logs/gp_prep_%A_%a.out
 #SBATCH --error=logs/gp_prep_%A_%a.err
 
-# step 25: precompute genotype probabilities for rare imputed variants
 # Per-chromosome: renames VCF samples, maps ancestry, extracts GP for rare variants
 
 set -euo pipefail
