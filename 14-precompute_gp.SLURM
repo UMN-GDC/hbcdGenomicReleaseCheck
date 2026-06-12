@@ -30,7 +30,7 @@ source /projects/standard/basu_hbcd/shared/.venv/bin/activate
 
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
 IMPDIR=/home/ood-coffm049/hbcdData/imputed
-ANCESTRY_FILE="/shared/release/hbcd/hbcd/rawdata/phenotype/sed_bm_demo.tsv"
+ANCESTRY_FILE="/shared/release/hbcd/hbcd/rawdata/phenotype/sed_basic_demographics.tsv"
 IMPUTED_DIRS=($IMPDIR/c1 $IMPDIR/c2 $IMPDIR/c3)
 CACHE_DIR=$IMPDIR/gp_cache
 SCRIPT_DIR=$(dirname "$0")
