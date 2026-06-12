@@ -14,13 +14,10 @@
 #   3 — Python/numpy replaces gawk (10-50x faster)
 #   4 — Per-ancestry parallelism via ANCESTRY_GROUPS env var
 #
-# Usage (all-in-one, default):
-#   sbatch 14-precompute_gp.SLURM
+# Usage: run via 14-submit_gp_prep.sh (auto-detects ancestries, submits array).
 #
-# Usage (ancestry-split, e.g. 23 chr × 4 groups = 92 jobs):
-#   sbatch --array=0-91 \
-#          --export=ALL,ANCESTRY_GROUPS="AFR,EUR,EAS,SAS,UNKNOWN" \
-#          14-precompute_gp.SLURM
+# Not intended to be called directly — use the submit script. Example:
+#   bash 14-submit_gp_prep.sh
 
 set -euo pipefail
 
@@ -30,7 +27,7 @@ source /projects/standard/basu_hbcd/shared/.venv/bin/activate
 
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
 IMPDIR=/home/ood-coffm049/hbcdData/imputed
-ANCESTRY_FILE="/shared/release/hbcd/hbcd/rawdata/phenotype/sed_bm_demo.tsv"
+ANCESTRY_FILE="/shared/release/hbcd/hbcd/rawdata/phenotype/sed_basic_demographics.tsv"
 IMPUTED_DIRS=($IMPDIR/c1 $IMPDIR/c2 $IMPDIR/c3)
 CACHE_DIR=$IMPDIR/gp_cache
 SCRIPT_DIR=$(dirname "$0")
