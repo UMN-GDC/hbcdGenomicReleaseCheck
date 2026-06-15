@@ -1,0 +1,235 @@
+---
+title: "Imputation QC Report"
+format:
+  html:
+    embed-resources: true
+    code-fold: true
+---
+
+```{python}
+#| label: setup
+import re
+import base64
+from pathlib import Path
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from IPython.display import display, HTML
+
+IMPUTED_DIR = Path("/home/ood-coffm049/hbcdData/imputed")
+CHUNKS = ["c1", "c2", "c3"]
+
+# ── parsers ─────────────────────────────────────────────────────────────
+
+def parse_qc_report(path):
+    text = path.read_text()
+    metrics = {}
+    patterns = {
+        "Reference Overlap (%)":        r"Reference Overlap:\s*([\d.]+)\s*%",
+        "Match":                        r"Match:\s*([\d,]+)",
+        "Allele switch":                r"Allele switch:\s*([\d,]+)",
+        "Strand flip":                  r"Strand flip:\s*([\d,]+)",
+        "Strand flip + allele switch":  r"Strand flip and allele switch:\s*([\d,]+)",
+        "A/T, C/G genotypes":          r"A/T, C/G genotypes:\s*([\d,]+)",
+        "Filter flag set":              r"Filter flag set:\s*([\d,]+)",
+        "Invalid alleles":              r"Invalid alleles:\s*([\d,]+)",
+        "Multiallelic sites":           r"Multiallelic sites:\s*([\d,]+)",
+        "Duplicated sites":             r"Duplicated sites:\s*([\d,]+)",
+        "NonSNP sites":                 r"NonSNP sites:\s*([\d,]+)",
+        "Monomorphic sites":            r"Monomorphic sites:\s*([\d,]+)",
+        "Allele mismatch":              r"Allele mismatch:\s*([\d,]+)",
+        "SNPs call rate < 90%":         r"SNPs call rate < 90%:\s*([\d,]+)",
+        "Excluded sites (total)":       r"Excluded sites in total:\s*([\d,]+)",
+        "Remaining sites (total)":      r"Remaining sites in total:\s*([\d,]+)",
+        "Typed only sites":             r"Typed only sites:\s*([\d,]+)",
+        "Chunks excluded":              r"(\d+)\s*Chunk\(s\) excluded:",
+        "Remaining chunks":             r"Remaining chunk\(s\):\s*(\d+)",
+    }
+    for name, pat in patterns.items():
+        m = re.search(pat, text)
+        if m:
+            val = m.group(1).replace(",", "")
+            try:
+                metrics[name] = int(val)
+            except ValueError:
+                metrics[name] = float(val)
+    return metrics
+
+
+def parse_snps_excluded(path):
+    df = pd.read_csv(path, sep=r"\s+")
+    return df["INFO"].value_counts()
+
+
+def parse_snps_typed_only(path):
+    df = pd.read_csv(path, sep=r"\s+")
+    return df["CHROM"].value_counts().sort_index()
+
+
+def parse_chunks_excluded(path):
+    return pd.read_csv(path, sep=r"\s+")
+
+
+def embed_html_collapsible(path):
+    if not path.exists():
+        display(HTML("<p><em>quality-control.html not found</em></p>"))
+        return
+    try:
+        content = path.read_bytes()
+        b64 = base64.b64encode(content).decode()
+        src = f"data:text/html;base64,{b64}"
+        display(HTML(
+            '<details><summary>quality-control.html</summary>'
+            f'<iframe src="{src}" width="100%" height="600px" '
+            'style="border:1px solid #ccc;border-radius:4px;"></iframe>'
+            '</details>'
+        ))
+    except Exception:
+        display(HTML(
+            f'<details><summary>quality-control.html</summary>'
+            f'<p><a href="file:///{path.as_posix()}" target="_blank">Open file</a></p>'
+            '</details>'
+        ))
+
+
+def report_chunk(ch, data):
+    qc = data.get("qc", {})
+
+    # ── metrics ──
+    if qc:
+        cats = [
+            ("Reference", ["Reference Overlap (%)", "Match"]),
+            ("Strand / Allele", ["Allele switch", "Strand flip",
+                                 "Strand flip + allele switch", "A/T, C/G genotypes"]),
+            ("Filtered sites", ["Filter flag set", "Invalid alleles",
+                                "Multiallelic sites", "Duplicated sites",
+                                "NonSNP sites", "Monomorphic sites",
+                                "Allele mismatch", "SNPs call rate < 90%"]),
+            ("Summary", ["Excluded sites (total)", "Remaining sites (total)",
+                         "Typed only sites", "Chunks excluded", "Remaining chunks"]),
+        ]
+        for group, keys in cats:
+            print(f"**{group}**")
+            for k in keys:
+                if k in qc:
+                    print(f"- {k}: **{qc[k]:,}**")
+            print()
+
+    # ── excluded SNPs bar chart ──
+    if "snps_excluded" in data:
+        counts = data["snps_excluded"]
+        fig, ax = plt.subplots(figsize=(8, max(3, len(counts) * 0.35)))
+        colors = plt.cm.Set2(np.linspace(0, 1, len(counts)))
+        bars = ax.barh(counts.index, counts.values, color=colors, edgecolor="k", linewidth=0.5)
+        ax.set_xlabel("SNPs excluded")
+        ax.set_title(f"Excluded SNPs by reason ({ch})")
+        for b, v in zip(bars, counts.values):
+            ax.text(v + max(counts.values) * 0.01,
+                    b.get_y() + b.get_height() / 2,
+                    f"{v:,}", va="center", fontsize=9)
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("*No snps-excluded.txt found*")
+
+    # ── typed-only SNPs bar chart ──
+    if "snps_typed" in data:
+        counts = data["snps_typed"]
+        fig, ax = plt.subplots(figsize=(8, max(3, len(counts) * 0.35)))
+        colors = plt.cm.Pastel1(np.linspace(0, 1, len(counts)))
+        bars = ax.barh(counts.index.astype(str), counts.values,
+                       color=colors, edgecolor="k", linewidth=0.5)
+        ax.set_xlabel("Typed-only SNPs")
+        ax.set_title(f"Typed-only SNPs by chromosome ({ch})")
+        for b, v in zip(bars, counts.values):
+            ax.text(v + max(counts.values) * 0.01,
+                    b.get_y() + b.get_height() / 2,
+                    f"{v:,}", va="center", fontsize=9)
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("*No snps-typed-only.txt found*")
+
+    # ── chunks excluded table ──
+    ce = data.get("chunks_excluded")
+    if ce is not None and len(ce):
+        print("**Chunks excluded (< 20 SNPs)**")
+        display(ce.style.set_table_attributes('class="table table-sm"'))
+    else:
+        print("*No excluded chunks*")
+
+    # ── qc html embed ──
+    embed_html_collapsible(data.get("html_path", Path("/dev/null")))
+
+
+# ── load all chunk data ─────────────────────────────────────────────────
+
+chunk_data = {}
+for ch in CHUNKS:
+    d = {}
+    base = IMPUTED_DIR / ch
+
+    qc_path = base / "qc_report.txt"
+    if qc_path.exists():
+        d["qc"] = parse_qc_report(qc_path)
+
+    excl_path = base / "statistics" / "snps-excluded.txt"
+    if excl_path.exists():
+        d["snps_excluded"] = parse_snps_excluded(excl_path)
+
+    typed_path = base / "statistics" / "snps-typed-only.txt"
+    if typed_path.exists():
+        d["snps_typed"] = parse_snps_typed_only(typed_path)
+
+    chunks_excl_path = base / "statistics" / "chunks-excluded.txt"
+    if chunks_excl_path.exists():
+        d["chunks_excluded"] = parse_chunks_excluded(chunks_excl_path)
+    else:
+        d["chunks_excluded"] = None
+
+    d["html_path"] = base / "quality-control.html"
+
+    chunk_data[ch] = d
+```
+
+---
+
+## QC Summary by Chunk {.panel-tabset}
+
+```{python}
+#| label: summary-table
+rows = []
+for ch in CHUNKS:
+    qc = chunk_data[ch].get("qc", {})
+    rows.append({
+        "Chunk": ch,
+        "Reference Overlap (%)": qc.get("Reference Overlap (%)", "—"),
+        "Remaining sites": qc.get("Remaining sites (total)", "—"),
+        "Excluded sites": qc.get("Excluded sites (total)", "—"),
+        "Typed only": qc.get("Typed only sites", "—"),
+        "Chunks excluded": qc.get("Chunks excluded", "—"),
+    })
+summary = pd.DataFrame(rows).set_index("Chunk")
+display(summary.style.set_table_attributes('class="table table-sm"').format(precision=2, na_rep="—"))
+```
+
+### c1
+
+```{python}
+#| label: c1
+report_chunk("c1", chunk_data["c1"])
+```
+
+### c2
+
+```{python}
+#| label: c2
+report_chunk("c2", chunk_data["c2"])
+```
+
+### c3
+
+```{python}
+#| label: c3
+report_chunk("c3", chunk_data["c3"])
+```
