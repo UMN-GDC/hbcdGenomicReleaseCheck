@@ -1,0 +1,4 @@
+flowchart LR
+  A["Raw HBCD (1753)"] -->|"QC fail (22) + controls (28) removed"| B["onlyQc (1703)"]
+  B -->|exclusion lists| C["Excluded in QC (93)"]
+  B --> D["Release candidate (1610)"]
