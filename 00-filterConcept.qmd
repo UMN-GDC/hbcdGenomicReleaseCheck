@@ -281,9 +281,9 @@ y_bot = 1.1
 
 box(ax, 1.2, y_mid, f"Raw HBCD\n({n_total})", blue)
 box(ax, 3.8, y_top, f"Controls\n({n_controls})", red)
-box(ax, 3.8, y_bot, f"QC failures\n({n_qc})", red)
-box(ax, 4.5, y_mid, f"onlyQc\n({n_onlyqc})", green)
-box(ax, 7.5, y_top, f"Excluded (∩ onlyQc)\n({n_excluded_qc})", orange)
+box(ax, 3.8, y_bot, f"Failed QC\n({n_qc})", red)
+box(ax, 4.5, y_mid, f"Passed QC\n({n_onlyqc})", green)
+box(ax, 7.5, y_top, f"Excluded \n({n_excluded_qc})", orange)
 box(ax, 7.5, y_bot, f"Release\n({n_release})", ltblue)
 
 # arrows from Raw HBCD right edge (x=2.15)
