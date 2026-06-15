@@ -247,58 +247,68 @@ plt.show()
 #| label: pipeline-flow
 #| fig-cap: "Pipeline overview — filter flow from raw HBCD to release candidate"
 #| fig-width: 10
-#| fig-height: 4
+#| fig-height: 4.5
 
 n_total = len(remapped_ids)
 n_controls = len(control_ids & remapped_ids)
 n_qc = len(qc_fail_ids)
 n_onlyqc = len(onlyqc_ids)
-n_excluded = len(all_exc_iids)
+n_excluded_qc = len(onlyqc_ids & all_exc_iids)
 n_release = len(onlyqc_ids - all_exc_iids)
 
-fig, ax = plt.subplots(figsize=(10, 4))
+fig, ax = plt.subplots(figsize=(10, 4.5))
 ax.axis("off")
 ax.set_xlim(0, 10)
-ax.set_ylim(0, 4)
+ax.set_ylim(0, 4.5)
 
 blue = "#1f78b4"
 green = "#33a02c"
 orange = "#ff7f00"
 ltblue = "#a6cee3"
+red = "#e31a1c"
 
-def box(ax, x, y, text, color, w=2.2, h=1.0):
+def box(ax, x, y, text, color, w=1.9, h=0.8):
     rect = plt.Rectangle((x - w / 2, y - h / 2), w, h,
                          facecolor=color, edgecolor="k", linewidth=1.5,
                          alpha=0.55, zorder=2)
     ax.add_patch(rect)
-    ax.text(x, y, text, ha="center", va="center", fontsize=11, zorder=3)
+    ax.text(x, y, text, ha="center", va="center", fontsize=10, zorder=3)
 
-box(ax, 1.6, 2.0, f"Raw HBCD\n({n_total})", blue)
-box(ax, 4.2, 2.0, f"onlyQc\n({n_onlyqc})", green)
-box(ax, 7.2, 1.0, f"Excluded\n({n_excluded})", orange)
-box(ax, 7.2, 3.0, f"Release\n({n_release})", ltblue)
+# row positions
+y_mid = 2.4
+y_top = 3.7
+y_bot = 1.1
 
-ax.annotate("", xy=(3.1, 2.0), xytext=(2.7, 2.0),
+box(ax, 1.2, y_mid, f"Raw HBCD\n({n_total})", blue)
+box(ax, 3.8, y_top, f"Controls\n({n_controls})", red)
+box(ax, 3.8, y_bot, f"QC failures\n({n_qc})", red)
+box(ax, 4.5, y_mid, f"onlyQc\n({n_onlyqc})", green)
+box(ax, 7.5, y_top, f"Excluded (∩ onlyQc)\n({n_excluded_qc})", orange)
+box(ax, 7.5, y_bot, f"Release\n({n_release})", ltblue)
+
+# arrows from Raw HBCD right edge (x=2.15)
+ax.annotate("", xy=(2.9, 3.7), xytext=(2.15, 2.7),
+            arrowprops=dict(arrowstyle="->", lw=1.5, color="k"), zorder=1)
+ax.annotate("", xy=(2.9, 1.1), xytext=(2.15, 2.1),
+            arrowprops=dict(arrowstyle="->", lw=1.5, color="k"), zorder=1)
+ax.annotate("", xy=(3.5, 2.4), xytext=(2.15, 2.4),
             arrowprops=dict(arrowstyle="->", lw=2, color="k"), zorder=1)
-ax.annotate("QC fail + controls", xy=(3.1, 2.0), xytext=(2.75, 1.7),
-            fontsize=8, ha="center", va="top", zorder=3)
 
-ax.annotate("", xy=(5.35, 3.0), xytext=(5.35, 2.5),
-            arrowprops=dict(arrowstyle="->", lw=2, color="k"), zorder=1)
-ax.annotate("exclusion lists", xy=(5.35, 3.0), xytext=(5.35, 3.15),
+# split from onlyQc right edge (x=5.45)
+ax.scatter([5.45], [2.4], color="k", s=30, zorder=4)
+ax.annotate("exclusion lists", xy=(5.45, 2.6), xytext=(5.45, 3.0),
             fontsize=8, ha="center", va="bottom", zorder=3)
-
-ax.scatter([5.35], [2.5], color="k", s=30, zorder=4)
-
-ax.annotate("", xy=(6.1, 1.0), xytext=(5.35, 1.95),
-            arrowprops=dict(arrowstyle="->", lw=2, color="k"), zorder=1)
+ax.annotate("", xy=(6.55, 3.7), xytext=(5.55, 2.5),
+            arrowprops=dict(arrowstyle="->", lw=1.5, color="k"), zorder=1)
+ax.annotate("", xy=(6.55, 1.1), xytext=(5.55, 2.3),
+            arrowprops=dict(arrowstyle="->", lw=1.5, color="k"), zorder=1)
 
 plt.tight_layout()
 plt.show()
 
 diagram = f"""flowchart LR
   A["Raw HBCD ({n_total})"] -->|"QC fail ({n_qc}) + controls ({n_controls}) removed"| B["onlyQc ({n_onlyqc})"]
-  B -->|exclusion lists| C["Excluded ({n_excluded})"]
+  B -->|exclusion lists| C["Excluded in QC ({n_excluded_qc})"]
   B --> D["Release candidate ({n_release})"]
 """
 Path("pipeline.mmd").write_text(diagram)
