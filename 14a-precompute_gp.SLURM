@@ -29,6 +29,8 @@ conda activate python  # default for Python (main pipeline)
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
 IMPDIR=/home/ood-coffm049/hbcdData/imputed
 ANCESTRY_FILE="/shared/release/hbcd/hbcd/rawdata/phenotype/sed_basic_demographics.tsv"
+# sed_basic_demographics_child_race: 0=White, 1=Black, 2=AIAN, 3=Asian,
+#                                     4=Hawaiian/PI, 5=Two+, 6=Other, 7=Unknown
 IMPUTED_DIRS=($IMPDIR/c1 $IMPDIR/c2 $IMPDIR/c3)
 CACHE_DIR=$IMPDIR/gp_cache
 SCRIPT_DIR=$(dirname "$0")
@@ -106,13 +108,14 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
         samples <- read_lines("'"$CACHE_DIR/sample_order.txt"'")
         ancestry <- read_delim("'"$ANCESTRY_FILE"'",
                                show_col_types = FALSE, delim = "\t")
-        ancestry <- ancestry %>%
-            filter(!is.na(.data[["sed_basic_demographics_child_race"]])) %>%
-            count(participant_id, sed_basic_demographics_child_race) %>%
-            group_by(participant_id) %>%
-            slice_max(n, n = 1, with_ties = FALSE) %>%
-            ungroup() %>%
-            select(sid = participant_id,
+ancestry <- ancestry %>%
+    filter(!is.na(.data[["sed_basic_demographics_child_race"]]),
+           session_id == "ses-V02") %>%
+    count(participant_id, sed_basic_demographics_child_race) %>%
+    group_by(participant_id) %>%
+    slice_max(n, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    select(sid = participant_id,
                    ancestry = sed_basic_demographics_child_race)
         mapping <- tibble(sid = tolower(samples)) %>%
             left_join(ancestry %>% mutate(sid = tolower(sid)), by = "sid")

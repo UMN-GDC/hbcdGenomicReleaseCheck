@@ -23,10 +23,16 @@ if [ -f "$ANC_CACHE" ]; then
     N_ANC=$(awk '!seen[$2]++{c++} END{print c}' "$ANC_CACHE")
 else
     echo "Detecting ancestries from: $ANC_SRC"
+    echo "  Note: 0=White, 1=Black, 2=AIAN, 3=Asian, 4=Hawaiian/PI, 5=Two+, 6=Other, 7=Unknown"
     if [ -f "$ANC_SRC" ]; then
         ANC_GROUPS=$(awk -F'\t' '
-            NR==1 {for(i=1;i<=NF;i++) if($i=="sed_basic_demographics_child_race") col=i}
-            NR>1 && $col!="" {print $col}
+            NR==1 {
+                for(i=1;i<=NF;i++) {
+                    if($i=="sed_basic_demographics_child_race") race_col=i
+                    if($i=="session_id") sess_col=i
+                }
+            }
+            NR>1 && $race_col!="" && $sess_col=="ses-V02" {print $race_col}
         ' "$ANC_SRC" | sort -u | paste -sd, -)
     fi
     N_ANC=$(echo "$ANC_GROUPS" | awk -F',' '{print NF}')
