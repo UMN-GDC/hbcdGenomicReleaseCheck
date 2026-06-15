@@ -65,14 +65,21 @@ echo "--- Processing chr${chr} ${MODE_TAG}---"
 # ── Rename VCF samples (remove FID_ prefix) ──────────────────────────
 first_sample=$(bcftools query -l "$VCF_FILE" | head -1) || true
 if echo "$first_sample" | grep -q '_'; then
-    echo "  Renaming samples"
-    bcftools reheader --samples \
-        <(bcftools query -l "$VCF_FILE" \
-            | awk '{o=$0; sub(/^[^_]+_/,"",$0); print o,$0}') \
-        "$VCF_FILE" \
-      | bcftools view -Oz -o "${VCF_FILE}.tmp"
-    mv "${VCF_FILE}.tmp" "$VCF_FILE"
-    tabix -f -p vcf "$VCF_FILE"
+    # Lock so ancestry-split jobs don't race on the same VCF
+    LOCK="$CACHE_DIR/.reheader_${chr}"
+    if mkdir "$LOCK" 2>/dev/null; then
+        echo "  Renaming samples"
+        bcftools reheader --samples \
+            <(bcftools query -l "$VCF_FILE" \
+                | awk '{o=$0; sub(/^[^_]+_/,"",$0); print o,$0}') \
+            "$VCF_FILE" -o "${VCF_FILE}.tmp"
+        mv "${VCF_FILE}.tmp" "$VCF_FILE"
+        tabix -f -p vcf "$VCF_FILE"
+        rmdir "$LOCK"
+    else
+        # Another job is handling the reheader; wait for it
+        while [ -d "$LOCK" ]; do sleep 5; done
+    fi
 else
     echo "  Sample names already clean"
 fi
@@ -87,8 +94,7 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
         bcftools reheader --samples \
             <(bcftools query -l "$FIRST_VCF" \
                 | awk '{o=$0; sub(/^[^_]+_/,"",$0); print o,$0}') \
-            "$FIRST_VCF" \
-          | bcftools view -Oz -o "${FIRST_VCF}.tmp"
+            "$FIRST_VCF" -o "${FIRST_VCF}.tmp"
         mv "${FIRST_VCF}.tmp" "$FIRST_VCF"
         tabix -f -p vcf "$FIRST_VCF"
     fi
