@@ -99,7 +99,7 @@ for s in excl_iids_lists.values():
 
 ```{python}
 #| label: pipeline-flow
-from IPython.display import display, Mermaid
+from IPython.display import display, HTML
 
 n_total = len(remapped_ids)
 n_controls = len(control_ids & remapped_ids)
@@ -108,15 +108,14 @@ n_onlyqc = len(onlyqc_ids)
 n_excluded = len(all_exc_iids)
 n_release = len(onlyqc_ids - all_exc_iids)
 
-diagram = f"""
-flowchart LR
+diagram = f"""flowchart LR
   A["Raw HBCD ({n_total})"] -->|"QC fail ({n_qc}) + controls ({n_controls}) removed"| B["onlyQc ({n_onlyqc})"]
   B -->|exclusion lists| C["Excluded ({n_excluded})"]
   B --> D["Release candidate ({n_release})"]
 """
 
-Path("pipeline.mmd").write_text(diagram.strip())
-display(Mermaid(diagram))
+Path("pipeline.mmd").write_text(diagram)
+display(HTML(f'<div class="mermaid">\n{diagram}\n</div>'))
 ```
 
 ---
