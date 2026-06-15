@@ -12,12 +12,14 @@ logs/
 .excel
 .xls
 .xlsx
+.out
 archive/*
 !test-log.txt
 .html
 # Session Data files
 .RData
 .RDataTmp
+.venv
 
 # User-specific files
 .Ruserdata
