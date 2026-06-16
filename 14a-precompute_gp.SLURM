@@ -103,30 +103,53 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
 
     bcftools query -l "$FIRST_VCF" > "$CACHE_DIR/sample_order.txt"
 
-    # Filter to C-suffixed IIDs only for ancestry mapping
-    awk '/[Cc]$/' "$CACHE_DIR/sample_order.txt" > "$CACHE_DIR/sample_order_c.txt"
-    awk '/[Cc]$/ {sub(/[Cc]$/, ""); print}' "$CACHE_DIR/sample_order.txt" \
-        > "$CACHE_DIR/sample_order_clean.txt"
+    # Create typed sample list: <clean_sid> <type>  (type = c or m)
+    # Used for ancestry mapping: C-type → child race (ses-V02),
+    # M-type → mother race (ses-V01)
+    awk '{type=tolower(substr($0, length($0))); \
+          clean=substr($0, 1, length($0)-1); \
+          print tolower(clean), type}' "$CACHE_DIR/sample_order.txt" \
+        > "$CACHE_DIR/sample_order_typed.txt"
 
     conda run -n R Rscript --vanilla -e '
         library(tidyverse, quietly = TRUE)
-        samples <- read_lines("'"$CACHE_DIR/sample_order_clean.txt"'")
-        ancestry <- read_delim("'"$ANCESTRY_FILE"'",
-                               show_col_types = FALSE, delim = "\t")
-ancestry <- ancestry %>%
-    filter(!is.na(.data[["sed_basic_demographics_child_race"]]),
-           session_id == "ses-V02") %>%
-    count(participant_id, sed_basic_demographics_child_race) %>%
-    group_by(participant_id) %>%
-    slice_max(n, n = 1, with_ties = FALSE) %>%
-    ungroup() %>%
-    select(sid = participant_id,
-                   ancestry = sed_basic_demographics_child_race)
-        mapping <- tibble(sid = tolower(samples)) %>%
-            left_join(ancestry %>% mutate(sid = tolower(sid)), by = "sid")
-        mapping$ancestry[is.na(mapping$ancestry)] <- "UNKNOWN"
-        write_tsv(mutate(mapping, pos = row_number()) %>%
-                      select(pos, ancestry),
+        si <- read_table("'"$CACHE_DIR/sample_order_typed.txt"'",
+                         col_names = c("sid", "type"), col_types = "cc")
+        dm <- read_delim("'"$ANCESTRY_FILE"'",
+                         show_col_types = FALSE, delim = "\t")
+
+        race_names <- c("0" = "WHT", "1" = "BLK", "2" = "AIAN",
+                        "3" = "ASN", "4" = "HPI", "5" = "2PLUS",
+                        "6" = "OTH", "7" = "UNK")
+
+        child_lookup <- dm %>%
+            filter(!is.na(.data[["sed_basic_demographics_child_race"]]),
+                   session_id == "ses-V02") %>%
+            count(participant_id, sed_basic_demographics_child_race) %>%
+            group_by(participant_id) %>%
+            slice_max(n, n = 1, with_ties = FALSE) %>%
+            ungroup() %>%
+            transmute(sid = tolower(participant_id),
+                      ancestry = race_names[as.character(sed_basic_demographics_child_race)])
+
+        mother_lookup <- dm %>%
+            filter(!is.na(.data[["sed_basic_demographics_screen_mother_race"]]),
+                   session_id == "ses-V01") %>%
+            count(participant_id, sed_basic_demographics_screen_mother_race) %>%
+            group_by(participant_id) %>%
+            slice_max(n, n = 1, with_ties = FALSE) %>%
+            ungroup() %>%
+            transmute(sid = tolower(participant_id),
+                      ancestry = race_names[as.character(sed_basic_demographics_screen_mother_race)])
+
+        mapping <- si %>%
+            mutate(ancestry = case_when(
+                type == "c" ~ child_lookup$ancestry[match(sid, child_lookup$sid)],
+                type == "m" ~ mother_lookup$ancestry[match(sid, mother_lookup$sid)],
+                TRUE ~ NA_character_
+            ), ancestry = replace_na(ancestry, "UNKNOWN"))
+
+        write_tsv(mapping %>% transmute(pos = row_number(), ancestry),
                   file.path("'"$CACHE_DIR"'", "sample_ancestry.txt"),
                   col_names = FALSE)
     '
@@ -143,12 +166,10 @@ if [ -n "$ANC" ]; then
     ANC_FILE="$CACHE_DIR/anc_${ANC}_${chr}.txt"
     SAMPLE_FILE="$CACHE_DIR/samples_${ANC}_${chr}.txt"
 
-    # Sample list in VCF order + renumbered ancestry file
-    # Use sample_order_c.txt (C-suffixed only) to match sample_ancestry.txt rows
-    paste "$CACHE_DIR/sample_order_c.txt" "$CACHE_DIR/sample_ancestry.txt" \
+    paste "$CACHE_DIR/sample_order.txt" "$CACHE_DIR/sample_ancestry.txt" \
         | awk -v anc="$ANC" '$3 == anc {print $1}' \
         > "$SAMPLE_FILE"
-    paste "$CACHE_DIR/sample_order_c.txt" "$CACHE_DIR/sample_ancestry.txt" \
+    paste "$CACHE_DIR/sample_order.txt" "$CACHE_DIR/sample_ancestry.txt" \
         | awk -v anc="$ANC" '$3 == anc {pos++; print pos, $3}' \
         > "$ANC_FILE"
 
