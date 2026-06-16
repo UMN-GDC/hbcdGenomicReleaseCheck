@@ -118,6 +118,11 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
         dm <- read_delim("'"$ANCESTRY_FILE"'",
                          show_col_types = FALSE, delim = "\t")
 
+        cat("--- DEBUG: dm columns:", paste(names(dm), collapse = ", "), "\n")
+        cat("--- DEBUG: session_id values:", paste(unique(dm$session_id), collapse = ", "), "\n")
+        cat("--- DEBUG: si head:", nrow(si), "rows, types:", paste(unique(si$type), collapse = ","), "\n")
+        print(head(si, 3))
+
         race_names <- c("0" = "WHT", "1" = "BLK", "2" = "AIAN",
                         "3" = "ASN", "4" = "HPI", "5" = "2PLUS",
                         "6" = "OTH", "7" = "UNK")
@@ -142,12 +147,20 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
             transmute(sid = tolower(participant_id),
                       ancestry = race_names[as.character(sed_basic_demographics_screen_mother_race)])
 
+        cat("--- DEBUG: child_lookup:", nrow(child_lookup), "rows ---\n")
+        print(head(child_lookup, 3))
+        cat("--- DEBUG: mother_lookup:", nrow(mother_lookup), "rows ---\n")
+        print(head(mother_lookup, 3))
+
         mapping <- si %>%
             mutate(ancestry = case_when(
                 type == "c" ~ child_lookup$ancestry[match(sid, child_lookup$sid)],
                 type == "m" ~ mother_lookup$ancestry[match(sid, mother_lookup$sid)],
                 TRUE ~ NA_character_
             ), ancestry = replace_na(ancestry, "UNKNOWN"))
+
+        cat("--- DEBUG: mapping ancestry values:",
+            paste(unique(mapping$ancestry), collapse = ","), "\n")
 
         write_tsv(mapping %>% transmute(pos = row_number(), ancestry),
                   file.path("'"$CACHE_DIR"'", "sample_ancestry.txt"),
