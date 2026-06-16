@@ -34,7 +34,7 @@ child_lookup <- dm %>%
     group_by(participant_id) %>%
     slice_max(n, n = 1, with_ties = FALSE) %>%
     ungroup() %>%
-    transmute(sid = tolower(participant_id),
+    transmute(sid = str_remove(tolower(participant_id), "^sub-"),
               ancestry = as.character(sed_basic_demographics_child_race))
 
 cat("\nchild_lookup:", nrow(child_lookup), "rows\n")
@@ -52,7 +52,7 @@ mother_lookup <- dm %>%
     group_by(participant_id) %>%
     slice_max(n, n = 1, with_ties = FALSE) %>%
     ungroup() %>%
-    transmute(sid = tolower(participant_id),
+    transmute(sid = str_remove(tolower(participant_id), "^sub-"),
               ancestry = as.character(sed_basic_demographics_screen_mother_race))
 
 cat("\nmother_lookup:", nrow(mother_lookup), "rows\n")
