@@ -28,25 +28,37 @@ df <- read_tsv(CNV_FILE, show_col_types = FALSE) %>%
 dm <- read_tsv(DEMO_FILE, show_col_types = FALSE)
 
 child_lookup <- dm %>%
-  filter(!is.na(sed_basic_demographics_child_race), session_id == "ses-V02") %>%
-  count(participant_id, sed_basic_demographics_child_race) %>%
+  filter(session_id == "ses-V02") %>%
   group_by(participant_id) %>%
-  slice_max(n, n = 1, with_ties = FALSE) %>%
-  ungroup() %>%
+  summarise(
+    race = {
+      r <- na.omit(sed_basic_demographics_child_race)
+      if (length(r) == 0) "UNK" else race_names[as.character(names(sort(table(r), decreasing = TRUE))[1])]
+    },
+    AGE = mean(AGE, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
   transmute(
     pscid = str_remove(tolower(participant_id), "^sub-"),
-    race = race_names[as.character(sed_basic_demographics_child_race)]
+    race = replace_na(race, "UNK"),
+    AGE
   )
 
 mother_lookup <- dm %>%
-  filter(!is.na(sed_basic_demographics_screen_mother_race), session_id == "ses-V01") %>%
-  count(participant_id, sed_basic_demographics_screen_mother_race) %>%
+  filter(session_id == "ses-V01") %>%
   group_by(participant_id) %>%
-  slice_max(n, n = 1, with_ties = FALSE) %>%
-  ungroup() %>%
+  summarise(
+    race = {
+      r <- na.omit(sed_basic_demographics_screen_mother_race)
+      if (length(r) == 0) "UNK" else race_names[as.character(names(sort(table(r), decreasing = TRUE))[1])]
+    },
+    AGE = mean(AGE, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
   transmute(
     pscid = str_remove(tolower(participant_id), "^sub-"),
-    race = race_names[as.character(sed_basic_demographics_screen_mother_race)]
+    race = replace_na(race, "UNK"),
+    AGE
   )
 
 df <- df %>%
@@ -61,6 +73,34 @@ df <- df %>%
   mutate(
     race = replace_na(race, "UNK"),
     b_allele_freq = as.numeric(b_allele_freq)
+  )
+
+# GRCh38 chromosome lengths for cumulative genomic position
+chrlens <- c(248956422, 242193529, 198295559, 190214555, 181538259,
+             170805979, 159345973, 145138636, 138394717, 133797422,
+             135086622, 133275309, 114364328, 107043718, 101991189,
+             90338345, 83257441, 80373285, 58617616, 64444167,
+             46709983, 50818468, 156040895, 57227415)
+names(chrlens) <- as.character(c(1:22, "X", "Y"))
+chr_offset <- setNames(c(0, cumsum(head(chrlens, -1))), names(chrlens))
+chr_boundaries <- cumsum(chrlens)
+
+df <- df %>%
+  mutate(
+    chr_num = case_when(
+      chromosome == "X" ~ 23L,
+      chromosome == "Y" ~ 24L,
+      TRUE ~ as.integer(chromosome)
+    ),
+    pos_cum = position + chr_offset[as.character(chr_num)],
+    age_bin = case_when(
+      AGE < 2 ~ "<2",
+      between(AGE, 15, 20) ~ "15-20",
+      between(AGE, 21, 25) ~ "21-25",
+      between(AGE, 26, 30) ~ "26-30",
+      between(AGE, 31, 35) ~ "30-35",
+      AGE >= 36 ~ "35+"
+    )
   )
 ```
 
@@ -464,4 +504,144 @@ if (nrow(paired) > 0) {
 } else {
   cat("*No paired C-M participants found*")
 }
+```
+
+## Stratified by Race
+
+Race distribution and CNV metrics stratified by reported race, split by child (C) and mother (M) type.
+
+```{r}
+#| label: race-breakdown
+race_colors <- c("WHT" = "#1f78b4", "BLK" = "#e31a1c", "AIAN" = "#33a02c",
+                 "ASN" = "#ff7f00", "HPI" = "#6a3d9a", "2PLUS" = "#b15928",
+                 "OTH" = "#cab2d6", "UNK" = "#999999")
+
+df %>%
+  filter(!is.na(type)) %>%
+  count(race, type) %>%
+  pivot_wider(id_cols = race, names_from = type, values_from = n, values_fill = 0) %>%
+  arrange(race) %>%
+  knitr::kable()
+```
+
+### LRR by Race and Type
+
+```{r}
+#| label: race-lrr
+#| fig-width: 12
+#| fig-height: 5
+df %>%
+  filter(!is.na(type), !is.na(log_r_ratio)) %>%
+  ggplot(aes(race, log_r_ratio, fill = type)) +
+  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
+  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
+  labs(x = "Reported race", y = "Log R Ratio", fill = NULL) +
+  theme_minimal()
+```
+
+### BAF by Race and Type
+
+```{r}
+#| label: race-baf
+#| fig-width: 12
+#| fig-height: 5
+df %>%
+  filter(!is.na(type), !is.na(b_allele_freq)) %>%
+  ggplot(aes(race, b_allele_freq, fill = type)) +
+  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
+  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
+  labs(x = "Reported race", y = "B Allele Frequency", fill = NULL) +
+  theme_minimal()
+```
+
+### CNV Value and Confidence by Race
+
+```{r}
+#| label: race-cnv
+#| fig-width: 12
+#| fig-height: 5
+p1 <- df %>%
+  filter(!is.na(type), !is.na(cnv_value)) %>%
+  ggplot(aes(race, cnv_value, fill = type)) +
+  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
+  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
+  labs(x = "Reported race", y = "CNV value", fill = NULL) +
+  theme_minimal()
+
+p2 <- df %>%
+  filter(!is.na(type), !is.na(cnv_confidence)) %>%
+  ggplot(aes(race, cnv_confidence, fill = type)) +
+  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
+  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
+  labs(x = "Reported race", y = "Confidence", fill = NULL) +
+  theme_minimal()
+
+grid.arrange(p1, p2, ncol = 2)
+```
+
+## Genomic Profile
+
+Smoothed trend of each CNV metric across the genome, styled like a Manhattan plot with alternating chromosome bands. Colored by reported race, faceted by age bin and sample type (C/M).
+
+```{r}
+#| label: gp-chr-bands
+#| fig-width: 14
+#| fig-height: 10
+
+chr_bands <- data.frame(
+  start = chr_offset,
+  end = chr_offset + chrlens,
+  fill = ifelse(seq_along(chrlens) %% 2 == 0, "even", "odd"),
+  row.names = names(chrlens)
+)
+
+make_genome_plot <- function(data, y_var, y_label) {
+  ggplot(data, aes(pos_cum / 1e6, {{ y_var }}, color = race)) +
+    geom_rect(
+      data = chr_bands,
+      aes(xmin = start / 1e6, xmax = end / 1e6, ymin = -Inf, ymax = Inf, fill = fill),
+      inherit.aes = FALSE, alpha = 0.12
+    ) +
+    scale_fill_manual(values = c("even" = "grey60", "odd" = "transparent"), guide = "none") +
+    geom_vline(xintercept = chr_boundaries / 1e6, alpha = 0.25, linewidth = 0.25) +
+    geom_smooth(se = FALSE, span = 0.04, linewidth = 0.5, na.rm = TRUE) +
+    facet_grid(age_bin ~ type, scales = "free_y") +
+    scale_color_manual(values = race_colors) +
+    labs(x = "Genomic position (Mb)", y = y_label, color = "Race") +
+    theme_minimal() +
+    theme(
+      panel.grid.minor = element_blank(),
+      panel.spacing = unit(0.6, "lines"),
+      strip.text = element_text(size = 8)
+    )
+}
+
+p_lrr <- df %>%
+  filter(!is.na(type), !is.na(log_r_ratio)) %>%
+  make_genome_plot(log_r_ratio, "Log R Ratio")
+print(p_lrr)
+```
+
+### B Allele Frequency
+
+```{r}
+#| label: gp-baf
+#| fig-width: 14
+#| fig-height: 10
+p_baf <- df %>%
+  filter(!is.na(type), !is.na(b_allele_freq)) %>%
+  make_genome_plot(b_allele_freq, "B Allele Frequency")
+print(p_baf)
+```
+
+### CNV Value
+
+```{r}
+#| label: gp-cnv
+#| fig-width: 14
+#| fig-height: 10
+p_cnv_gp <- df %>%
+  filter(!is.na(type), !is.na(cnv_value)) %>%
+  make_genome_plot(cnv_value, "CNV Value")
+print(p_cnv_gp)
 ```
