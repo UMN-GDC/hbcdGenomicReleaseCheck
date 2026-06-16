@@ -11,9 +11,10 @@ ANC_SRC="/shared/release/hbcd/hbcd/rawdata/phenotype/sed_basic_demographics.tsv"
 N_CHR=23
 SCRIPT_DIR=$(dirname "$0")
 
-# 0=White, 1=Black, 2=AIAN, 3=Asian, 4=Hawaiian/PI, 5=Two+, 6=Other, 7=Unknown
+# Map numeric race codes to abbreviations (must match 14a-precompute_gp.SLURM)
 ANC_GROUPS=$(awk -F'\t' '
-  NR>1 && $2=="ses-V02" && $4!="" {print $4}
+  BEGIN{split("WHT BLK AIAN ASN HPI 2PLUS OTH UNK",a); for(i=0;i<8;i++) m[i]=a[i+1]}
+  NR>1 && $2=="ses-V02" && $4!="" {print m[$4]}
 ' "$ANC_SRC" | sort -u | paste -sd, -)
 N_ANC=$(echo "$ANC_GROUPS" | awk -F',' '{print NF}')
 
