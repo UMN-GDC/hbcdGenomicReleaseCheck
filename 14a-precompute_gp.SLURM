@@ -7,10 +7,10 @@
 #SBATCH --output=logs/gp_prep_%A_%a.out
 #SBATCH --error=logs/gp_prep_%A_%a.err
 
-# Per-chromosome (optionally × ancestry): extracts GP for rare variants.
+# Per-chromosome (optionally × ancestry): extracts GP for low-MAF variants.
 #
 # Options 2-4 implemented:
-#   2 — bcftools view -i INFO/R2 filter (no -R regions file)
+#   2 — bcftools view -i INFO/MAF filter (no -R regions file)
 #   3 — Python/numpy replaces gawk (10-50x faster)
 #   4 — Per-ancestry parallelism via ANCESTRY_GROUPS env var
 #
@@ -190,21 +190,21 @@ if [ -n "$ANC" ]; then
     echo "  Filtering to $ANC: $(wc -l < "$SAMPLE_FILE") samples"
 fi
 
-# ── Count rare variants ──────────────────────────────────────────────
+# ── Count low-MAF variants ──────────────────────────────────────────
 if [ -z "$INFO_FILE" ]; then
-    n_rare=$(bcftools view -i 'R2<0.1 && R2>0' "$VCF_FILE" 2>/dev/null \
+    n_low_maf=$(bcftools view -i 'MAF<0.05 && MAF>0' "$VCF_FILE" 2>/dev/null \
         | bcftools query -f '%CHROM\t%POS\n' | wc -l)
 else
-    n_rare=$(zcat "$INFO_FILE" \
-        | awk -F'\t' 'NR>1 && $4!="" && $4+0<0.1 && $4+0>0 {c++} END {print c+0}')
+    n_low_maf=$(zcat "$INFO_FILE" \
+        | awk -F'\t' 'NR>1 && $3!="" && $3+0<0.05 && $3+0>0 {c++} END {print c+0}')
 fi
 
-echo "  Rare variants: $n_rare"
+echo "  Low-MAF variants (MAF<0.05): $n_low_maf"
 
 OUT_RDS="$CACHE_DIR/chr${chr}${ANC:+_$ANC}.rds"
 
-if [ "$n_rare" -eq 0 ]; then
-    echo "  No rare variants, saving empty RDS"
+if [ "$n_low_maf" -eq 0 ]; then
+    echo "  No low-MAF variants, saving empty RDS"
     conda run -n R Rscript --vanilla -e '
         saveRDS(list(sums = NULL, hist_bins = NULL, ridge = NULL, call_rate = NULL),
                 file = "'"$OUT_RDS"'")
@@ -219,10 +219,10 @@ TMPDIR=$(mktemp -d)
 BC_ARGS=()
 [ -n "$ANC" ] && BC_ARGS+=(-S "$SAMPLE_FILE")
 
-# Try VCF INFO/R2 filter (fastest); fall back to info file variant list
-if bcftools view -h "$VCF_FILE" 2>/dev/null | grep -q '##INFO.*<ID=R2'; then
-    echo "  Filtering: VCF INFO/R2"
-    bcftools view -i 'R2<0.1 && R2>0' "${BC_ARGS[@]}" "$VCF_FILE" -Ou 2>/dev/null \
+# Try VCF INFO/MAF filter (fastest); fall back to info file variant list
+if bcftools view -h "$VCF_FILE" 2>/dev/null | grep -q '##INFO.*<ID=MAF'; then
+    echo "  Filtering: VCF INFO/MAF"
+    bcftools view -i 'MAF<0.05 && MAF>0' "${BC_ARGS[@]}" "$VCF_FILE" -Ou 2>/dev/null \
         | bcftools query -f '%CHROM\t%POS[\t%GP]\n' \
         | python "$SCRIPT_DIR/compute_gp_stats.py" \
             --ancestry "$ANCESTRY_FILE_USE" \
@@ -231,7 +231,7 @@ if bcftools view -h "$VCF_FILE" 2>/dev/null | grep -q '##INFO.*<ID=R2'; then
 else
     echo "  Filtering: info file variant list"
     zcat "$INFO_FILE" \
-        | awk -F'\t' 'NR>1 && $4!="" && $4+0<0.1 && $4+0>0 {print $1}' \
+        | awk -F'\t' 'NR>1 && $3!="" && $3+0<0.05 && $3+0>0 {print $1}' \
         > "$CACHE_DIR/chr${chr}_ids.txt"
     bcftools view -i "ID=@$CACHE_DIR/chr${chr}_ids.txt" \
         "${BC_ARGS[@]}" "$VCF_FILE" -Ou 2>/dev/null \
