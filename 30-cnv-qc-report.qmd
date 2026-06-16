@@ -58,7 +58,10 @@ df <- df %>%
     ),
     by = c("pscid", "type")
   ) %>%
-  mutate(race = replace_na(race, "UNK"))
+  mutate(
+    race = replace_na(race, "UNK"),
+    b_allele_freq = as.numeric(b_allele_freq)
+  )
 ```
 
 ## Overview
@@ -461,73 +464,4 @@ if (nrow(paired) > 0) {
 } else {
   cat("*No paired C-M participants found*")
 }
-```
-
-## Stratified by Race
-
-Race distribution and CNV metrics stratified by reported race, split by child (C) and mother (M) type.
-
-```{r}
-#| label: race-breakdown
-df %>%
-  filter(!is.na(type)) %>%
-  count(race, type) %>%
-  pivot_wider(id_cols = race, names_from = type, values_from = n, values_fill = 0) %>%
-  arrange(race) %>%
-  knitr::kable()
-```
-
-### LRR by Race and Type
-
-```{r}
-#| label: race-lrr
-#| fig-width: 12
-#| fig-height: 5
-df %>%
-  filter(!is.na(type), !is.na(log_r_ratio)) %>%
-  ggplot(aes(race, log_r_ratio, fill = type)) +
-  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
-  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
-  labs(x = "Reported race", y = "Log R Ratio", fill = NULL) +
-  theme_minimal()
-```
-
-### BAF by Race and Type
-
-```{r}
-#| label: race-baf
-#| fig-width: 12
-#| fig-height: 5
-df %>%
-  filter(!is.na(type), !is.na(b_allele_freq)) %>%
-  ggplot(aes(race, b_allele_freq, fill = type)) +
-  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
-  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
-  labs(x = "Reported race", y = "B Allele Frequency", fill = NULL) +
-  theme_minimal()
-```
-
-### CNV Value and Confidence by Race
-
-```{r}
-#| label: race-cnv
-#| fig-width: 12
-#| fig-height: 5
-p1 <- df %>%
-  filter(!is.na(type), !is.na(cnv_value)) %>%
-  ggplot(aes(race, cnv_value, fill = type)) +
-  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
-  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
-  labs(x = "Reported race", y = "CNV value", fill = NULL) +
-  theme_minimal()
-
-p2 <- df %>%
-  filter(!is.na(type), !is.na(cnv_confidence)) %>%
-  ggplot(aes(race, cnv_confidence, fill = type)) +
-  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
-  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
-  labs(x = "Reported race", y = "Confidence", fill = NULL) +
-  theme_minimal()
-
-grid.arrange(p1, p2, ncol = 2)
 ```
