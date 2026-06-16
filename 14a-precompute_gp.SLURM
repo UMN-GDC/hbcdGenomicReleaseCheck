@@ -103,9 +103,14 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
 
     bcftools query -l "$FIRST_VCF" > "$CACHE_DIR/sample_order.txt"
 
+    # Filter to C-suffixed IIDs only for ancestry mapping
+    awk '/[Cc]$/' "$CACHE_DIR/sample_order.txt" > "$CACHE_DIR/sample_order_c.txt"
+    awk '/[Cc]$/ {sub(/[Cc]$/, ""); print}' "$CACHE_DIR/sample_order.txt" \
+        > "$CACHE_DIR/sample_order_clean.txt"
+
     conda run -n R Rscript --vanilla -e '
         library(tidyverse, quietly = TRUE)
-        samples <- read_lines("'"$CACHE_DIR/sample_order.txt"'")
+        samples <- read_lines("'"$CACHE_DIR/sample_order_clean.txt"'")
         ancestry <- read_delim("'"$ANCESTRY_FILE"'",
                                show_col_types = FALSE, delim = "\t")
 ancestry <- ancestry %>%
@@ -139,10 +144,11 @@ if [ -n "$ANC" ]; then
     SAMPLE_FILE="$CACHE_DIR/samples_${ANC}_${chr}.txt"
 
     # Sample list in VCF order + renumbered ancestry file
-    paste "$CACHE_DIR/sample_order.txt" "$CACHE_DIR/sample_ancestry.txt" \
+    # Use sample_order_c.txt (C-suffixed only) to match sample_ancestry.txt rows
+    paste "$CACHE_DIR/sample_order_c.txt" "$CACHE_DIR/sample_ancestry.txt" \
         | awk -v anc="$ANC" '$3 == anc {print $1}' \
         > "$SAMPLE_FILE"
-    paste "$CACHE_DIR/sample_order.txt" "$CACHE_DIR/sample_ancestry.txt" \
+    paste "$CACHE_DIR/sample_order_c.txt" "$CACHE_DIR/sample_ancestry.txt" \
         | awk -v anc="$ANC" '$3 == anc {pos++; print pos, $3}' \
         > "$ANC_FILE"
 
