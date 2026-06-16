@@ -18,10 +18,13 @@ echo "Ancestry groups: $ANC_GROUPS"
 echo "Submitting array 0-$N_TASKS ($((N_TASKS+1)) tasks)"
 
 if [ "${1:-}" = "--setup-only" ]; then
-    echo "sbatch --array=0-${N_TASKS} --export=ALL,ANCESTRY_GROUPS=\"$ANC_GROUPS\" $SCRIPT_DIR/14a-precompute_gp.SLURM"
+    echo "export ANCESTRY_GROUPS=\"$ANC_GROUPS\""
+    echo "sbatch --array=0-${N_TASKS} --export=ALL $SCRIPT_DIR/14a-precompute_gp.SLURM"
     exit 0
 fi
 
+export ANCESTRY_GROUPS="$ANC_GROUPS"
+
 sbatch --array="0-${N_TASKS}" \
-       --export="ALL,ANCESTRY_GROUPS=$ANC_GROUPS" \
+       --export="ALL" \
        "$SCRIPT_DIR/14a-precompute_gp.SLURM"
