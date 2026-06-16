@@ -19,10 +19,10 @@ race_names <- c("0" = "WHT", "1" = "BLK", "2" = "AIAN",
                 "3" = "ASN", "4" = "HPI", "5" = "2PLUS",
                 "6" = "OTH", "7" = "UNK")
 
-df <- read_tsv(CNV_FILE, show_col_types = FALSE) %>%
+df <- read_tsv(CNV_FILE, show_col_types = FALSE, n_max=1500000) %>%
   mutate(
     type = str_extract(sample_id, "[CM]$"),
-    pscid = str_extract(sample_id, "_(\\d+)[CM]$", group = 1)
+    pscid = str_split_i(sample_id, "_", 3)
   )
 
 dm <- read_tsv(DEMO_FILE, show_col_types = FALSE)
@@ -35,13 +35,11 @@ child_lookup <- dm %>%
       r <- na.omit(sed_basic_demographics_child_race)
       if (length(r) == 0) "UNK" else race_names[as.character(names(sort(table(r), decreasing = TRUE))[1])]
     },
-    AGE = mean(AGE, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   transmute(
     pscid = str_remove(tolower(participant_id), "^sub-"),
     race = replace_na(race, "UNK"),
-    AGE
   )
 
 mother_lookup <- dm %>%
@@ -52,13 +50,11 @@ mother_lookup <- dm %>%
       r <- na.omit(sed_basic_demographics_screen_mother_race)
       if (length(r) == 0) "UNK" else race_names[as.character(names(sort(table(r), decreasing = TRUE))[1])]
     },
-    AGE = mean(AGE, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   transmute(
     pscid = str_remove(tolower(participant_id), "^sub-"),
     race = replace_na(race, "UNK"),
-    AGE
   )
 
 df <- df %>%
@@ -93,14 +89,6 @@ df <- df %>%
       TRUE ~ as.integer(chromosome)
     ),
     pos_cum = position + chr_offset[as.character(chr_num)],
-    age_bin = case_when(
-      AGE < 2 ~ "<2",
-      between(AGE, 15, 20) ~ "15-20",
-      between(AGE, 21, 25) ~ "21-25",
-      between(AGE, 26, 30) ~ "26-30",
-      between(AGE, 31, 35) ~ "30-35",
-      AGE >= 36 ~ "35+"
-    )
   )
 ```
 
