@@ -191,13 +191,8 @@ if [ -n "$ANC" ]; then
 fi
 
 # ── Count low-MAF variants ──────────────────────────────────────────
-if [ -z "$INFO_FILE" ]; then
-    n_low_maf=$(bcftools view -i 'MAF<0.05 && MAF>0' "$VCF_FILE" 2>/dev/null \
-        | bcftools query -f '%CHROM\t%POS\n' | wc -l)
-else
-    n_low_maf=$(zcat "$INFO_FILE" \
-        | awk -F'\t' 'NR>1 && $3!="" && $3+0<0.05 && $3+0>0 {c++} END {print c+0}')
-fi
+n_low_maf=$(bcftools view -i 'MAF>0 && MAF<0.05' "$VCF_FILE" 2>/dev/null \
+    | bcftools query -f '%CHROM\t%POS\n' | wc -l)
 
 echo "  Low-MAF variants (MAF<0.05): $n_low_maf"
 
@@ -219,29 +214,13 @@ TMPDIR=$(mktemp -d)
 BC_ARGS=()
 [ -n "$ANC" ] && BC_ARGS+=(-S "$SAMPLE_FILE")
 
-# Try VCF INFO/MAF filter (fastest); fall back to info file variant list
-if bcftools view -h "$VCF_FILE" 2>/dev/null | grep -q '##INFO.*<ID=MAF'; then
-    echo "  Filtering: VCF INFO/MAF"
-    bcftools view -i 'MAF<0.05 && MAF>0' "${BC_ARGS[@]}" "$VCF_FILE" -Ou 2>/dev/null \
-        | bcftools query -f '%CHROM\t%POS[\t%GP]\n' \
-        | python "$SCRIPT_DIR/compute_gp_stats.py" \
-            --ancestry "$ANCESTRY_FILE_USE" \
-            --chr "$chr" \
-            --outdir "$TMPDIR"
-else
-    echo "  Filtering: info file variant list"
-    zcat "$INFO_FILE" \
-        | awk -F'\t' 'NR>1 && $3!="" && $3+0<0.05 && $3+0>0 {print $1}' \
-        > "$CACHE_DIR/chr${chr}_ids.txt"
-    bcftools view -i "ID=@$CACHE_DIR/chr${chr}_ids.txt" \
-        "${BC_ARGS[@]}" "$VCF_FILE" -Ou 2>/dev/null \
-        | bcftools query -f '%CHROM\t%POS[\t%GP]\n' \
-        | python "$SCRIPT_DIR/compute_gp_stats.py" \
-            --ancestry "$ANCESTRY_FILE_USE" \
-            --chr "$chr" \
-            --outdir "$TMPDIR"
-    rm -f "$CACHE_DIR/chr${chr}_ids.txt"
-fi
+echo "  Filtering: VCF INFO/MAF"
+bcftools view -i 'MAF>0 && MAF<0.05' "${BC_ARGS[@]}" "$VCF_FILE" -Ou 2>/dev/null \
+    | bcftools query -f '%CHROM\t%POS[\t%GP]\n' \
+    | python "$SCRIPT_DIR/compute_gp_stats.py" \
+        --ancestry "$ANCESTRY_FILE_USE" \
+        --chr "$chr" \
+        --outdir "$TMPDIR"
 
 # ── Assemble RDS ─────────────────────────────────────────────────────
 conda run -n R Rscript --vanilla -e '
