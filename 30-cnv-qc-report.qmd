@@ -589,20 +589,10 @@ chr_labels <- data.frame(
 )
 
 make_genome_plot <- function(data, y_var, y_label) {
-  ggplot(data, aes(pos_cum / 1e6, {{ y_var }}, color = race)) +
-    geom_rect(
-      data = chr_bands,
-      aes(xmin = start / 1e6, xmax = end / 1e6, ymin = -Inf, ymax = Inf, fill = fill),
-      inherit.aes = FALSE, alpha = 0.12
-    ) +
-    scale_fill_manual(values = c("even" = "grey60", "odd" = "transparent"), guide = "none") +
-    geom_vline(xintercept = chr_boundaries / 1e6, alpha = 0.25, linewidth = 0.25) +
-    geom_text(data = chr_labels, aes(x = pos, y = -Inf, label = chr),
-              inherit.aes = FALSE, vjust = 3, size = 2.5, color = "grey40") +
-    geom_smooth(se = FALSE, span = 0.004, linewidth = 0.5, na.rm = TRUE) +
-    facet_wrap(~ type, ncol = 2, scales = "free_y") +
+  ggplot(data, aes(pos_cum / 1e6, {{ y_var }}, color = race, linetype  = type)) +
+    geom_smooth(method = "gam", se = FALSE, linewidth = 0.5, na.rm = TRUE) +
+    facet_wrap(~chr_num, scales = "free_x") +
     scale_color_manual(values = race_colors) +
-    labs(x = "Chromosome", y = y_label, color = "Race") +
     theme_minimal() +
     theme(
       axis.text.x = element_blank(),
