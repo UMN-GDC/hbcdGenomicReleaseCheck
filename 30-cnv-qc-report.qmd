@@ -27,8 +27,19 @@ df <- read_tsv(CNV_FILE, show_col_types = FALSE, n_max=1500000) %>%
 
 dm <- read_tsv(DEMO_FILE, show_col_types = FALSE)
 
+# Crosswalk: prerelease pscid → release_candid
+IDENTIFIERS_FILE <- "/projects/standard/basu_hbcd/shared/data/release_identifiers_20260526.csv"
+ids <- read_csv(IDENTIFIERS_FILE, show_col_types = FALSE) %>%
+  filter(release_candid != "release_candid") %>%
+  mutate(
+    pscid = tolower(as.character(pscid)),
+    release_candid = as.character(as.integer(release_candid))
+  ) %>%
+  distinct(pscid, release_candid)
+
 child_lookup <- dm %>%
   filter(session_id == "ses-V02") %>%
+  mutate(participant_id = str_remove(tolower(participant_id), "^sub-")) %>%
   group_by(participant_id) %>%
   summarise(
     race = {
@@ -38,12 +49,13 @@ child_lookup <- dm %>%
     .groups = "drop"
   ) %>%
   transmute(
-    pscid = str_remove(tolower(participant_id), "^sub-"),
-    race = replace_na(race, "UNK"),
+    release_candid = participant_id,
+    race = replace_na(race, "UNK")
   )
 
 mother_lookup <- dm %>%
   filter(session_id == "ses-V01") %>%
+  mutate(participant_id = str_remove(tolower(participant_id), "^sub-")) %>%
   group_by(participant_id) %>%
   summarise(
     race = {
@@ -53,18 +65,19 @@ mother_lookup <- dm %>%
     .groups = "drop"
   ) %>%
   transmute(
-    pscid = str_remove(tolower(participant_id), "^sub-"),
-    race = replace_na(race, "UNK"),
+    release_candid = participant_id,
+    race = replace_na(race, "UNK")
   )
 
 df <- df %>%
   mutate(pscid = tolower(pscid)) %>%
+  left_join(ids, by = "pscid") %>%
   left_join(
     bind_rows(
       child_lookup %>% mutate(type = "C"),
       mother_lookup %>% mutate(type = "M")
     ),
-    by = c("pscid", "type")
+    by = c("release_candid", "type")
   ) %>%
   mutate(
     race = replace_na(race, "UNK"),
