@@ -70,7 +70,7 @@ mother_lookup <- dm %>%
   )
 
 df <- df %>%
-  mutate(pscid = tolower(pscid)) %>%
+  mutate(pscid = str_remove(tolower(pscid), "[cm]$")) %>%
   left_join(ids, by = "pscid") %>%
   left_join(
     bind_rows(
@@ -80,7 +80,6 @@ df <- df %>%
     by = c("release_candid", "type")
   ) %>%
   mutate(
-    race = replace_na(race, "UNK"),
     b_allele_freq = as.numeric(b_allele_freq)
   )
 
