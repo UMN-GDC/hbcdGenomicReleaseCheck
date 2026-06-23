@@ -1,5 +1,5 @@
 ---
-title: "CNV QC Report"
+title: "CNV Genomic Profile — Rolling Average by Chromosome"
 format:
   html:
     embed-resources: true
@@ -10,20 +10,19 @@ format:
 #| label: setup
 #| message: false
 library(tidyverse)
-library(gridExtra)
-library(data.table)
+library(ggh4x)
+library(zoo)
 
-race_colors <- c("WHT" = "#1f78b4", "BLK" = "#e31a1c", "AIAN" = "#33a02c",
-                 "ASN" = "#ff7f00", "HPI" = "#6a3d9a", "2PLUS" = "#b15928",
-                 "OTH" = "#cab2d6", "UNK" = "#999999")
 CNV_FILE <- "/projects/standard/basu_hbcd/shared/data_handoff/CNV_slim.txt"
 DEMO_FILE <- "/projects/regulated/cdni-nih-bdc/shared/data/HBCD/HBCD_prerelease_tabulated_data/phenotype/sed_basic_demographics.tsv"
 
 race_names <- c("0" = "WHT", "1" = "BLK", "2" = "AIAN",
                 "3" = "ASN", "4" = "HPI", "5" = "2PLUS",
                 "6" = "OTH", "7" = "UNK")
+race_colors <- c("WHT" = "#1f78b4", "BLK" = "#e31a1c", "AIAN" = "#33a02c",
+                 "ASN" = "#ff7f00", "HPI" = "#6a3d9a", "2PLUS" = "#b15928",
+                 "OTH" = "#cab2d6", "UNK" = "#999999")
 
-#df <- read_tsv(CNV_FILE, show_col_types = FALSE, n_max=1500000) %>%
 df <- read_tsv(CNV_FILE, show_col_types = FALSE) %>%
   mutate(
     type = str_extract(sample_id, "[CM]$"),
@@ -33,7 +32,6 @@ df <- read_tsv(CNV_FILE, show_col_types = FALSE) %>%
 dm <- read_tsv(DEMO_FILE, show_col_types = FALSE) |>
   mutate(participant_id = str_remove(participant_id, "^sub-"))
 
-# Crosswalk: prerelease pscid → release_candid
 IDENTIFIERS_FILE <- "/projects/standard/basu_hbcd/shared/data/release_identifiers_20260526.csv"
 ids <- read_csv(IDENTIFIERS_FILE, show_col_types = FALSE) %>%
   filter(release_candid != "release_candid") %>%
@@ -47,11 +45,7 @@ child_lookup <- dm %>%
       if (length(r) == 0) "UNK" else race_names[as.character(names(sort(table(r), decreasing = TRUE))[1])]
     },
   ) %>%
-  transmute(
-    release_candid = participant_id,
-    race = replace_na(race, "UNK") ,
-    type = "C"
-  )
+  transmute(release_candid = participant_id, race = replace_na(race, "UNK"), type = "C")
 
 mother_lookup <- dm %>%
   filter(session_id == "ses-V01") %>%
@@ -61,22 +55,16 @@ mother_lookup <- dm %>%
       if (length(r) == 0) "UNK" else race_names[as.character(names(sort(table(r), decreasing = TRUE))[1])]
     },
   ) %>%
-  transmute(
-    release_candid = participant_id,
-    race = replace_na(race, "UNK"),
-    type = "M"
-  )
+  transmute(release_candid = participant_id, race = replace_na(race, "UNK"), type = "M")
 
 demos <- bind_rows(child_lookup, mother_lookup)
 
 df <- df %>%
   left_join(ids, by = "pscid") %>%
-  left_join(demos, by = c("release_candid", "type"))|> 
-  mutate(
-    b_allele_freq = as.numeric(b_allele_freq)
-  )
+  left_join(demos, by = c("release_candid", "type")) |>
+  mutate(b_allele_freq = as.numeric(b_allele_freq))
 
-# GRCh38 chromosome lengths for cumulative genomic position
+# GRCh38 chromosome lengths
 chrlens <- c(248956422, 242193529, 198295559, 190214555, 181538259,
              170805979, 159345973, 145138636, 138394717, 133797422,
              135086622, 133275309, 114364328, 107043718, 101991189,
@@ -84,7 +72,6 @@ chrlens <- c(248956422, 242193529, 198295559, 190214555, 181538259,
              46709983, 50818468, 156040895, 57227415)
 names(chrlens) <- as.character(c(1:22, "X", "Y"))
 chr_offset <- setNames(c(0, cumsum(head(chrlens, -1))), names(chrlens))
-chr_boundaries <- cumsum(chrlens)
 
 df <- df %>%
   mutate(
@@ -95,68 +82,85 @@ df <- df %>%
     ),
     pos_cum = position + chr_offset[as.character(chr_num)],
   )
+
+cat("Rows:", scales::comma(nrow(df)), "\n")
+cat("Samples:", scales::comma(n_distinct(df$sample_id)), "\n")
+cat("Chromosomes:", n_distinct(df$chromosome), "\n")
 ```
-
-
 
 # Genomic Profile
 
-Smoothed trend of each CNV metric across the genome, styled like a Manhattan plot with alternating chromosome bands. Colored by reported race, faceted by age bin and sample type (C/M).
+Rolling median (k = 51 SNPs) of each CNV metric across each chromosome, computed per race × type group. Chromosome facets use independent scales via `ggh4x::facet_wrap2`. Colored by reported race, linetype distinguishes child (C) and mother (M).
 
 ```{r}
-#| label: gp-chr-bands
+#| label: roll
 #| fig-width: 14
 #| fig-height: 10
 
-chr_bands <- data.frame(
-  start = chr_offset,
-  end = chr_offset + chrlens,
-  fill = ifelse(seq_along(chrlens) %% 2 == 0, "even", "odd"),
-  row.names = names(chrlens)
-)
+df_roll <- df %>%
+  filter(!is.na(type), !is.na(race), !is.na(chr_num)) %>%
+  group_by(chr_num, race, type) %>%
+  arrange(pos_cum) %>%
+  mutate(
+    roll_lrr = rollmedian(log_r_ratio, k = 51, fill = NA),
+    roll_baf = rollmedian(b_allele_freq, k = 51, fill = NA),
+    roll_cnv = rollmedian(cnv_value, k = 51, fill = NA)
+  ) %>%
+  ungroup()
 
-chr_labels <- data.frame(
-  chr = names(chrlens),
-  pos = (chr_offset + chrlens / 2) / 1e6
-)
-
-make_genome_plot <- function(data, y_var, y_label) {
-  ggplot(data, aes(pos_cum / 1e6, {{ y_var }}, color = race, linetype  = type)) +
-    geom_smooth(method = "gam", se = FALSE, linewidth = 0.5, na.rm = TRUE) +
-    facet_wrap(~chr_num, scales = "free") +
-    scale_color_manual(values = race_colors) +
-    theme_minimal() +
-    theme(
-      axis.text.x = element_blank(),
-      panel.grid.minor = element_blank(),
-      panel.spacing = unit(0.6, "lines"),
-      strip.text = element_text(size = 8)
-    )
-}
-
-df %>%
-  filter(!is.na(type), !is.na(log_r_ratio)) %>%
-  make_genome_plot(log_r_ratio, "Log R Ratio")
+cat("Rolling avg computed — rows:", scales::comma(nrow(df_roll)), "\n")
 ```
 
-### B Allele Frequency
+## Log R Ratio
 
 ```{r}
-#| label: gp-baf
-#| fig-width: 14
-#| fig-height: 10
-df %>%
-  filter(!is.na(type), !is.na(b_allele_freq)) %>%
-  make_genome_plot(b_allele_freq, "B Allele Frequency")
+#| label: roll-lrr
+#| fig-width: 16
+#| fig-height: 12
+df_roll %>%
+  filter(!is.na(roll_lrr)) %>%
+  ggplot(aes(position / 1e6, roll_lrr, color = race, linetype = type)) +
+  geom_line(na.rm = TRUE, linewidth = 0.4) +
+  facet_wrap2(~chr_num, scales = "free", axes = "all") +
+  scale_color_manual(values = race_colors) +
+  labs(x = "Position (Mb)", y = "Log R Ratio (rolling median, k=51)",
+       color = "Race", linetype = "Type") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(), strip.text = element_text(size = 8))
 ```
 
-### CNV Value
+## B Allele Frequency
 
 ```{r}
-#| label: gp-cnv
-#| fig-width: 14
-#| fig-height: 10
-df %>%
-  filter(!is.na(type), !is.na(cnv_value)) %>%
-  make_genome_plot(cnv_value, "CNV Value")
+#| label: roll-baf
+#| fig-width: 16
+#| fig-height: 12
+df_roll %>%
+  filter(!is.na(roll_baf)) %>%
+  ggplot(aes(position / 1e6, roll_baf, color = race, linetype = type)) +
+  geom_line(na.rm = TRUE, linewidth = 0.4) +
+  facet_wrap2(~chr_num, scales = "free", axes = "all") +
+  scale_color_manual(values = race_colors) +
+  labs(x = "Position (Mb)", y = "BAF (rolling median, k=51)",
+       color = "Race", linetype = "Type") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(), strip.text = element_text(size = 8))
+```
+
+## CNV Value
+
+```{r}
+#| label: roll-cnv
+#| fig-width: 16
+#| fig-height: 12
+df_roll %>%
+  filter(!is.na(roll_cnv)) %>%
+  ggplot(aes(position / 1e6, roll_cnv, color = race, linetype = type)) +
+  geom_line(na.rm = TRUE, linewidth = 0.4) +
+  facet_wrap2(~chr_num, scales = "free", axes = "all") +
+  scale_color_manual(values = race_colors) +
+  labs(x = "Position (Mb)", y = "CNV value (rolling median, k=51)",
+       color = "Race", linetype = "Type") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(), strip.text = element_text(size = 8))
 ```
