@@ -80,6 +80,7 @@ chrlens <- c(248956422, 242193529, 198295559, 190214555, 181538259,
              46709983, 50818468, 156040895, 57227415)
 names(chrlens) <- as.character(c(1:22, "X", "Y"))
 chr_offset <- setNames(c(0, cumsum(head(chrlens, -1))), names(chrlens))
+chr_boundaries <- cumsum(chrlens)
 
 df <- df %>%
   mutate(
@@ -112,6 +113,11 @@ chr_bands <- data.frame(
   row.names = names(chrlens)
 )
 
+chr_labels <- data.frame(
+  chr = names(chrlens),
+  pos = (chr_offset + chrlens / 2) / 1e6
+)
+
 make_rolling_plot <- function(data, y_var, y_label) {
   ggplot(data, aes(pos_cum / 1e6, {{ y_var }}, color = race, linetype = type)) +
     geom_rect(
@@ -120,15 +126,16 @@ make_rolling_plot <- function(data, y_var, y_label) {
       inherit.aes = FALSE, alpha = 0.12
     ) +
     scale_fill_manual(values = c("even" = "grey60", "odd" = "transparent"), guide = "none") +
+    geom_vline(xintercept = chr_boundaries / 1e6, alpha = 0.25, linewidth = 0.25) +
+    geom_text(data = chr_labels, aes(x = pos, y = -Inf, label = chr),
+              inherit.aes = FALSE, vjust = 3, size = 2.5, color = "grey40") +
     geom_line(na.rm = TRUE) +
-    facet_wrap(~chr_num, scales = "free") +
     scale_color_manual(values = race_colors) +
-    labs(x = "Genomic position (Mb)", y = y_label, color = "Race", linetype = "Type") +
+    labs(x = "Chromosome", y = y_label, color = "Race", linetype = "Type") +
     theme_minimal() +
     theme(
       axis.text.x = element_blank(),
       panel.grid.minor = element_blank(),
-      panel.spacing = unit(0.6, "lines"),
       strip.text = element_text(size = 8)
     )
 }
