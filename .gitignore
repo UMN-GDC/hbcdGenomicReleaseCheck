@@ -21,6 +21,9 @@ archive/*
 .RDataTmp
 .venv
 .html
+*_files
+*.rmarkdown
+*.html
 
 # User-specific files
 .Ruserdata

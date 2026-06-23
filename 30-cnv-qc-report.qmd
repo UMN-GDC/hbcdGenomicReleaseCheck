@@ -11,6 +11,7 @@ format:
 #| message: false
 library(tidyverse)
 library(gridExtra)
+library(data.table)
 
 CNV_FILE <- "/projects/standard/basu_hbcd/shared/data_handoff/CNV_slim.txt"
 DEMO_FILE <- "/projects/regulated/cdni-nih-bdc/shared/data/HBCD/HBCD_prerelease_tabulated_data/phenotype/sed_basic_demographics.tsv"
@@ -19,66 +20,55 @@ race_names <- c("0" = "WHT", "1" = "BLK", "2" = "AIAN",
                 "3" = "ASN", "4" = "HPI", "5" = "2PLUS",
                 "6" = "OTH", "7" = "UNK")
 
-df <- read_tsv(CNV_FILE, show_col_types = FALSE, n_max=1500000) %>%
+#df <- read_tsv(CNV_FILE, show_col_types = FALSE, n_max=1500000) %>%
+df <- read_tsv(CNV_FILE, show_col_types = FALSE) %>%
   mutate(
     type = str_extract(sample_id, "[CM]$"),
-    pscid = str_split_i(sample_id, "_", 3)
+    pscid = str_remove(str_split_i(sample_id, "_", 3), "[CM]$")
   )
 
-dm <- read_tsv(DEMO_FILE, show_col_types = FALSE)
+dm <- read_tsv(DEMO_FILE, show_col_types = FALSE) |>
+  mutate(participant_id = str_remove(participant_id, "^sub-"))
 
 # Crosswalk: prerelease pscid → release_candid
 IDENTIFIERS_FILE <- "/projects/standard/basu_hbcd/shared/data/release_identifiers_20260526.csv"
 ids <- read_csv(IDENTIFIERS_FILE, show_col_types = FALSE) %>%
   filter(release_candid != "release_candid") %>%
-  mutate(
-    pscid = tolower(as.character(pscid)),
-    release_candid = as.character(as.integer(release_candid))
-  ) %>%
   distinct(pscid, release_candid)
 
 child_lookup <- dm %>%
   filter(session_id == "ses-V02") %>%
-  mutate(participant_id = str_remove(tolower(participant_id), "^sub-")) %>%
-  group_by(participant_id) %>%
-  summarise(
+  reframe(.by = participant_id,
     race = {
       r <- na.omit(sed_basic_demographics_child_race)
       if (length(r) == 0) "UNK" else race_names[as.character(names(sort(table(r), decreasing = TRUE))[1])]
     },
-    .groups = "drop"
   ) %>%
   transmute(
     release_candid = participant_id,
-    race = replace_na(race, "UNK")
+    race = replace_na(race, "UNK") ,
+    type = "C"
   )
 
 mother_lookup <- dm %>%
   filter(session_id == "ses-V01") %>%
-  mutate(participant_id = str_remove(tolower(participant_id), "^sub-")) %>%
-  group_by(participant_id) %>%
-  summarise(
+  reframe(.by = participant_id,
     race = {
       r <- na.omit(sed_basic_demographics_screen_mother_race)
       if (length(r) == 0) "UNK" else race_names[as.character(names(sort(table(r), decreasing = TRUE))[1])]
     },
-    .groups = "drop"
   ) %>%
   transmute(
     release_candid = participant_id,
-    race = replace_na(race, "UNK")
+    race = replace_na(race, "UNK"),
+    type = "M"
   )
 
+demos <- bind_rows(child_lookup, mother_lookup)
+
 df <- df %>%
-  mutate(pscid = str_remove(tolower(pscid), "[cm]$")) %>%
   left_join(ids, by = "pscid") %>%
-  left_join(
-    bind_rows(
-      child_lookup %>% mutate(type = "C"),
-      mother_lookup %>% mutate(type = "M")
-    ),
-    by = c("release_candid", "type")
-  ) %>%
+  left_join(demos, by = c("release_candid", "type"))|> 
   mutate(
     b_allele_freq = as.numeric(b_allele_freq)
   )
@@ -143,7 +133,7 @@ df %>%
   knitr::kable()
 ```
 
-## Distributions
+## Aggregate Distributions
 
 ### Log R Ratio
 
@@ -300,18 +290,6 @@ per_chr %>%
   knitr::kable()
 ```
 
-```{r}
-#| label: plot-per-chrom
-#| fig-width: 10
-#| fig-height: 4
-per_chr %>%
-  mutate(chr = fct_inorder(as.character(chromosome))) %>%
-  ggplot(aes(chr, n_snps)) +
-  geom_col(fill = "#1f78b4", alpha = 0.8, colour = "white", linewidth = 0.3) +
-  geom_text(aes(label = scales::comma(n_snps)), vjust = -0.3, size = 2.8) +
-  labs(x = "Chromosome", y = "SNPs") +
-  theme_minimal()
-```
 
 ## Flagged Observations
 
@@ -366,7 +344,7 @@ cat("Unique M samples:", scales::comma(n_distinct(filter(df, type == "M")$sample
 cat("Participants with both C and M:", scales::comma(n_both), "\n")
 ```
 
-### LRR by Type
+### LRR by relation
 
 Overlaid density curves to detect systematic LRR shifts between child and mother samples.
 
@@ -394,7 +372,7 @@ p2 <- df %>%
 grid.arrange(p1, p2, ncol = 2)
 ```
 
-### BAF by Type
+### BAF by relation
 
 ```{r}
 #| label: cm-baf
@@ -429,13 +407,13 @@ p3 <- df %>%
 grid.arrange(p1, p2, p3, ncol = 3)
 ```
 
-### CNV Value and Confidence by Type
+### CNV Value  by relation
 
 ```{r}
 #| label: cm-box
 #| fig-width: 10
 #| fig-height: 4
-p_cnv <- df %>%
+df %>%
   filter(!is.na(type)) %>%
   ggplot(aes(type, cnv_value, fill = type)) +
   geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
@@ -443,15 +421,14 @@ p_cnv <- df %>%
   labs(x = NULL, y = "CNV value", fill = NULL) +
   theme_minimal()
 
-p_conf <- df %>%
-  filter(!is.na(type)) %>%
-  ggplot(aes(type, cnv_confidence, fill = type)) +
-  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
-  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c")) +
-  labs(x = NULL, y = "Confidence", fill = NULL) +
-  theme_minimal()
+# p_conf <- df %>%
+#   filter(!is.na(type)) %>%
+#   ggplot(aes(type, cnv_confidence, fill = type)) +
+#   geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
+#   scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c")) +
+#   labs(x = NULL, y = "Confidence", fill = NULL) +
+#   theme_minimal()
 
-grid.arrange(p_cnv, p_conf, ncol = 2)
 ```
 
 ### Paired C-M LRR Correlation
@@ -463,50 +440,37 @@ For participants with both a child and mother sample, comparing their mean LRR t
 #| fig-width: 8
 #| fig-height: 7
 
-paired <- df %>%
-  filter(!is.na(type)) %>%
-  group_by(pscid, type) %>%
-  summarise(mean_lrr = mean(log_r_ratio, na.rm = TRUE), .groups = "drop") %>%
-  pivot_wider(id_cols = pscid, names_from = type, values_from = mean_lrr) %>%
-  drop_na(C, M)
+paired <- setDT(df) |>
+  # 1. Pivot the data wide
+  dcast(pscid + snp_name ~ type, value.var = c("log_r_ratio", "b_allele_freq", "cnv_value")) |>
+  # 2. Remove incomplete pairs
+  na.omit() |>
+  # 3. Calculate all differences at once using a comma-separated list
+  _[, `:=`(
+    lrr = log_r_ratio_M - log_r_ratio_C,
+    b   = b_allele_freq_M - b_allele_freq_C,
+    cnv = cnv_value_M - cnv_value_C
+  )] |>
+  # 4. Keep only your final calculated columns
+  _[, .(pscid, snp_name, lrr, b, cnv)]
 
-if (nrow(paired) > 0) {
-  r <- cor(paired$C, paired$M, use = "complete.obs")
-  lims <- range(c(paired$C, paired$M))
+paired |>
+  reframe(.by = pscid , p25 = quantile(lrr, 0.25)) |>
+  ggplot(aes(x = p25)) +
+  geom_histogram() +
+  xlab("25 percentile of lrr")
 
-  p <- paired %>%
-    mutate(flagged = abs(C - M) > 0.5) %>%
-    ggplot(aes(C, M)) +
-    geom_abline(slope = 1, intercept = 0, linetype = "dashed", alpha = 0.4) +
-    geom_point(aes(colour = flagged), alpha = 0.6, size = 1.5) +
-    geom_smooth(method = "lm", se = FALSE, colour = "grey40", linewidth = 0.5) +
-    scale_colour_manual(values = c("FALSE" = "#1f78b4", "TRUE" = "#e31a1c")) +
-    coord_fixed(xlim = lims, ylim = lims) +
-    labs(x = "Mean LRR (C / child)", y = "Mean LRR (M / mother)",
-         colour = "|C-M| > 0.5", title = paste0("Paired C vs M LRR (r = ", round(r, 3), ")")) +
-    theme_minimal()
+paired |>
+  reframe(.by = pscid , p75 = quantile(lrr, 0.75)) |>
+  ggplot(aes(x = p75)) +
+  geom_histogram() +
+  xlab("75 percentile of lrr")
 
-  print(p)
 
-  n_flagged <- sum(abs(paired$C - paired$M) > 0.5)
-  cat("Paired participants:", scales::comma(nrow(paired)), "\n")
-  cat("Pearson r:", round(r, 3), "\n")
-  cat("|C - M| LRR > 0.5:", scales::comma(n_flagged), "participants\n")
-  if (n_flagged > 0) {
-    cat("\n**Flagged participants:**\n\n")
-    paired %>%
-      filter(abs(C - M) > 0.5) %>%
-      mutate(diff = round(abs(C - M), 4)) %>%
-      arrange(desc(diff)) %>%
-      select(pscid, C, M, diff) %>%
-      knitr::kable()
-  }
-} else {
-  cat("*No paired C-M participants found*")
-}
 ```
+Mean differences between subjects had low R2 (~0.04) likely because large number of noninformative CNVs compared between the pair
 
-## Stratified by Race
+# Stratified by Race
 
 Race distribution and CNV metrics stratified by reported race, split by child (C) and mother (M) type.
 
@@ -524,62 +488,8 @@ df %>%
   knitr::kable()
 ```
 
-### LRR by Race and Type
 
-```{r}
-#| label: race-lrr
-#| fig-width: 12
-#| fig-height: 5
-df %>%
-  filter(!is.na(type), !is.na(log_r_ratio)) %>%
-  ggplot(aes(race, log_r_ratio, fill = type)) +
-  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
-  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
-  labs(x = "Reported race", y = "Log R Ratio", fill = NULL) +
-  theme_minimal()
-```
-
-### BAF by Race and Type
-
-```{r}
-#| label: race-baf
-#| fig-width: 12
-#| fig-height: 5
-df %>%
-  filter(!is.na(type), !is.na(b_allele_freq)) %>%
-  ggplot(aes(race, b_allele_freq, fill = type)) +
-  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
-  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
-  labs(x = "Reported race", y = "B Allele Frequency", fill = NULL) +
-  theme_minimal()
-```
-
-### CNV Value and Confidence by Race
-
-```{r}
-#| label: race-cnv
-#| fig-width: 12
-#| fig-height: 5
-p1 <- df %>%
-  filter(!is.na(type), !is.na(cnv_value)) %>%
-  ggplot(aes(race, cnv_value, fill = type)) +
-  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
-  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
-  labs(x = "Reported race", y = "CNV value", fill = NULL) +
-  theme_minimal()
-
-p2 <- df %>%
-  filter(!is.na(type), !is.na(cnv_confidence)) %>%
-  ggplot(aes(race, cnv_confidence, fill = type)) +
-  geom_boxplot(alpha = 0.5, outlier.size = 0.3, outlier.alpha = 0.1) +
-  scale_fill_manual(values = c("C" = "#1f78b4", "M" = "#e31a1c"), labels = c("C (child)", "M (mother)")) +
-  labs(x = "Reported race", y = "Confidence", fill = NULL) +
-  theme_minimal()
-
-grid.arrange(p1, p2, ncol = 2)
-```
-
-## Genomic Profile
+# Genomic Profile
 
 Smoothed trend of each CNV metric across the genome, styled like a Manhattan plot with alternating chromosome bands. Colored by reported race, faceted by age bin and sample type (C/M).
 
@@ -603,7 +513,7 @@ chr_labels <- data.frame(
 make_genome_plot <- function(data, y_var, y_label) {
   ggplot(data, aes(pos_cum / 1e6, {{ y_var }}, color = race, linetype  = type)) +
     geom_smooth(method = "gam", se = FALSE, linewidth = 0.5, na.rm = TRUE) +
-    facet_wrap(~chr_num, scales = "free_x") +
+    facet_wrap(~chr_num, scales = "free") +
     scale_color_manual(values = race_colors) +
     theme_minimal() +
     theme(
@@ -614,10 +524,9 @@ make_genome_plot <- function(data, y_var, y_label) {
     )
 }
 
-p_lrr <- df %>%
+df %>%
   filter(!is.na(type), !is.na(log_r_ratio)) %>%
   make_genome_plot(log_r_ratio, "Log R Ratio")
-print(p_lrr)
 ```
 
 ### B Allele Frequency
@@ -626,10 +535,9 @@ print(p_lrr)
 #| label: gp-baf
 #| fig-width: 14
 #| fig-height: 10
-p_baf <- df %>%
+df %>%
   filter(!is.na(type), !is.na(b_allele_freq)) %>%
   make_genome_plot(b_allele_freq, "B Allele Frequency")
-print(p_baf)
 ```
 
 ### CNV Value
@@ -638,8 +546,7 @@ print(p_baf)
 #| label: gp-cnv
 #| fig-width: 14
 #| fig-height: 10
-p_cnv_gp <- df %>%
+df %>%
   filter(!is.na(type), !is.na(cnv_value)) %>%
   make_genome_plot(cnv_value, "CNV Value")
-print(p_cnv_gp)
 ```
