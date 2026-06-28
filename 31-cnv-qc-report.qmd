@@ -9,12 +9,15 @@ format:
 ```{r}
 #| label: setup
 #| message: false
-library(tidyverse)
+library(readr)
+library(stringr)
+library(dplyr)
 library(ggh4x)
 library(zoo)
 
 CNV_FILE <- "/projects/standard/basu_hbcd/shared/data_handoff/CNV_slim.txt"
 DEMO_FILE <- "/projects/regulated/cdni-nih-bdc/shared/data/HBCD/HBCD_prerelease_tabulated_data/phenotype/sed_basic_demographics.tsv"
+fam <- read_tsv("/projects/standard/basu_hbcd/shared/data/HBCD.fam", col_names = F)
 
 race_names <- c("0" = "WHT", "1" = "BLK", "2" = "AIAN",
                 "3" = "ASN", "4" = "HPI", "5" = "2PLUS",
@@ -23,11 +26,6 @@ race_colors <- c("WHT" = "#1f78b4", "BLK" = "#e31a1c", "AIAN" = "#33a02c",
                  "ASN" = "#ff7f00", "HPI" = "#6a3d9a", "2PLUS" = "#b15928",
                  "OTH" = "#cab2d6", "UNK" = "#999999")
 
-df <- read_tsv(CNV_FILE, show_col_types = FALSE) %>%
-  mutate(
-    type = str_extract(sample_id, "[CM]$"),
-    pscid = str_remove(str_split_i(sample_id, "_", 3), "[CM]$")
-  )
 
 dm <- read_tsv(DEMO_FILE, show_col_types = FALSE) |>
   mutate(participant_id = str_remove(participant_id, "^sub-"))
@@ -45,7 +43,7 @@ child_lookup <- dm %>%
       if (length(r) == 0) "UNK" else race_names[as.character(names(sort(table(r), decreasing = TRUE))[1])]
     },
   ) %>%
-  transmute(release_candid = participant_id, race = replace_na(race, "UNK"), type = "C")
+  transmute(release_candid = participant_id, type = "C")
 
 mother_lookup <- dm %>%
   filter(session_id == "ses-V01") %>%
@@ -55,15 +53,11 @@ mother_lookup <- dm %>%
       if (length(r) == 0) "UNK" else race_names[as.character(names(sort(table(r), decreasing = TRUE))[1])]
     },
   ) %>%
-  transmute(release_candid = participant_id, race = replace_na(race, "UNK"), type = "M")
+  transmute(release_candid = participant_id, type = "M")
 
 demos <- bind_rows(child_lookup, mother_lookup)
 
-df <- df %>%
-  left_join(ids, by = "pscid") %>%
-  left_join(demos, by = c("release_candid", "type")) |>
-  mutate(b_allele_freq = as.numeric(b_allele_freq))
-
+remove <- read_csv("../data/Remove.txt", col_names = F)
 # GRCh38 chromosome lengths
 chrlens <- c(248956422, 242193529, 198295559, 190214555, 181538259,
              170805979, 159345973, 145138636, 138394717, 133797422,
@@ -72,9 +66,18 @@ chrlens <- c(248956422, 242193529, 198295559, 190214555, 181538259,
              46709983, 50818468, 156040895, 57227415)
 names(chrlens) <- as.character(c(1:22, "X", "Y"))
 chr_offset <- setNames(c(0, cumsum(head(chrlens, -1))), names(chrlens))
-
-df <- df %>%
+df <- read_tsv(CNV_FILE, show_col_types = FALSE) %>%
   mutate(
+    type = str_extract(sample_id, "[CM]$"),
+    pscid = str_remove(str_split_i(sample_id, "_", 3), "[CM]$")
+  )
+df |>
+  filter(!sample_id %in% remove$X1) |>
+  filter(sample_id %in% fam$X1) |>
+  left_join(ids, by = "pscid") %>%
+  left_join(demos, by = c("release_candid", "type")) |>
+  mutate(
+    b_allele_freq = as.numeric(b_allele_freq),
     chr_num = case_when(
       chromosome == "X" ~ 23L,
       chromosome == "Y" ~ 24L,
