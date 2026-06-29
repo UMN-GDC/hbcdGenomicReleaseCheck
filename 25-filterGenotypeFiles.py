@@ -33,7 +33,7 @@ print(f"  Identifiers total              : {len(identifiers):>6}")
 # -- batch info (IID = {pscid}{C|M}; map pscid → release_candid) --
 batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
 n_raw = len(batch)
-valid_iid = batch["IID"].astype(str).str.match(r"^\d+[CM]$")
+valid_iid = batch["IID"].astype(str).str.match(r"^[A-Za-z]{5}\d{4}[CM]$")
 n_dropped = n_raw - valid_iid.sum()
 if n_dropped:
     print(f"  Dropped {n_dropped} batch row(s) with non-standard IID")
