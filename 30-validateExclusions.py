@@ -231,6 +231,15 @@ _check_file(
     reader="tsv",
 )
 
+# ── PC-Relate GRM gzipped text ──────────────────────────────────────────
+
+_check_file(
+    RELEASE_DIR / "hbcd_pcrelate_grm.grm.gz",
+    "hbcd_pcrelate_grm.grm.gz",
+    ["1", "3"],  # IID1, IID2 — headerless, 0-indexed
+    reader="fwf",
+)
+
 # ── CNV slim clean ───────────────────────────────────────────────────────
 
 _check_file(

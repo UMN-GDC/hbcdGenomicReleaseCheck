@@ -450,6 +450,27 @@ def test_pcrelate_grm_pairwise_ids_are_release():
     )
 
 
+# ── PC-Relate GRM gzipped text ────────────────────────────────────────
+
+
+def test_pcrelate_grm_gz_ids_are_release():
+    """All IID1/IID2 in hbcd_pcrelate_grm.grm.gz are release IIDs."""
+    p = RELEASE_DIR / "hbcd_pcrelate_grm.grm.gz"
+    if not p.exists():
+        pytest.skip("hbcd_pcrelate_grm.grm.gz not found")
+    df = pd.read_csv(
+        p, sep=r"\s+", header=None,
+        names=["FID1", "IID1", "FID2", "IID2", "N", "GRM"],
+        dtype=str,
+    )
+    all_ids = set(df["IID1"]).union(set(df["IID2"]))
+    extra = all_ids - _release_iids()
+    assert len(extra) == 0, (
+        f"{len(extra)} ID(s) in pcrelate_grm.grm.gz not in release set: "
+        f"{sorted(extra)[:10]}"
+    )
+
+
 # ── CNV slim clean ────────────────────────────────────────────────────
 
 

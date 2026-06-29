@@ -142,7 +142,7 @@ filter_binary_grm(
 # ===========================================================================
 print("\n--- PC-Relate GRM (text gz) ---")
 filter_grm_text_gz(
-    HANDOFF_DIR / "hbcd_pcrelate_grm.gz",
+    HANDOFF_DIR / "hbcd_pcrelate_grm.grm.gz",
     RELEASE_DIR / "hbcd_pcrelate_grm.gz",
 )
 
