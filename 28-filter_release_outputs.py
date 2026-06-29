@@ -21,6 +21,7 @@ import numpy as np
 from pathlib import Path
 from _lib import DATA_DIR, get_release_dir
 
+HANDOFF_DIR = DATA_DIR.parent / "data_handoff"
 NAME = "hbcd_rsid_harmonized"
 
 # Accept --release-dir / -r override, default from env/HBCD_RELEASE
@@ -300,7 +301,7 @@ for ext in ["csv", "tsv"]:
 # ===========================================================================
 print("\n--- PC-Relate GRM (binary) ---")
 filter_binary_grm(
-    str(DATA_DIR / "hbcd_pcrelate_grm"),
+    str(HANDOFF_DIR / "hbcd_pcrelate_grm"),
     str(RELEASE_DIR / "hbcd_pcrelate_grm"),
     id_ext=".id", bin_ext=".bin", n_ext=".N.bin",
 )
@@ -310,7 +311,7 @@ filter_binary_grm(
 # ===========================================================================
 print("\n--- PC-Relate GRM (text gz) ---")
 filter_grm_text_gz(
-    DATA_DIR / "hbcd_pcrelate_grm.gz",
+    HANDOFF_DIR / "hbcd_pcrelate_grm.gz",
     RELEASE_DIR / "hbcd_pcrelate_grm.gz",
 )
 
@@ -319,7 +320,7 @@ filter_grm_text_gz(
 # ===========================================================================
 print("\n--- PC-Relate GRM pairwise ---")
 filter_csv(
-    DATA_DIR / "hbcd_pcrelate_grm_pairwise.tsv",
+    HANDOFF_DIR / "hbcd_pcrelate_grm_pairwise.tsv",
     RELEASE_DIR / "hbcd_pcrelate_grm_pairwise.tsv",
     ["ID1", "ID2"],
 )
@@ -329,7 +330,7 @@ filter_csv(
 # ===========================================================================
 print("\n--- PC-Relate relatedness ---")
 filter_csv(
-    DATA_DIR / "hbcd_pcrelate_relatedness.tsv",
+    HANDOFF_DIR / "hbcd_pcrelate_relatedness.tsv",
     RELEASE_DIR / "hbcd_pcrelate_relatedness.tsv",
     ["subject_id_1", "subject_id_2"],
 )
@@ -339,7 +340,7 @@ filter_csv(
 # ===========================================================================
 print("\n--- PC-AiR 32 PCs clean ---")
 filter_text(
-    DATA_DIR / "hbcd_pcair_32PCs_clean.tsv",
+    HANDOFF_DIR / "hbcd_pcair_32PCs_clean.tsv",
     "participant_id",
     RELEASE_DIR / "hbcd_pcair_32PCs_clean.tsv",
 )
