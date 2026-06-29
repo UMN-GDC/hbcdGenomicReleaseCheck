@@ -4,12 +4,18 @@
 # Reads keep_list.txt (release IIDs) and writes filtered copies to the
 # release data directory, preserving the full-data originals in DATA_DIR.
 #
-# Filtered outputs:
-#   - GCTA binary GRM  →  release_dir/hbcd_gcta_grm.{grm.id,grm.bin,grm.N.bin}
-#   - PLINK GRM        →  release_dir/hbcd_plink_grm.{rel,rel.id}
-#   - PC-AiR scores    →  release_dir/hbcd_rsid_harmonized_pc_scores.txt
-#   - PC-Relate        →  release_dir/hbcd_rsid_harmonized_pcrelate_pairs.{csv,tsv}
-#   - etc.
+# Filtered outputs (all sourced from HANDOFF_DIR except pc_scores from DATA_DIR):
+#   - GCTA binary GRM          →  release_dir/hbcd_gcta_grm.{grm.id,grm.bin,grm.N.bin}
+#   - PLINK GRM                →  release_dir/hbcd_plink_grm.{rel,rel.id}
+#   - PC-AiR scores            →  release_dir/hbcd_rsid_harmonized_pc_scores.txt
+#   - PC-Relate pairs/IBD/self →  release_dir/hbcd_rsid_harmonized_pcrelate_{pairs,ibd,self}.{csv,tsv}
+#   - PC-Relate kinmat         →  release_dir/hbcd_rsid_harmonized_pcrelate_kinmat_{long,wide}.{csv,tsv}
+#   - PC-Relate GRM            →  release_dir/hbcd_pcrelate_grm.{grm.id,grm.bin,grm.N.bin,gz}
+#   - PC-Relate GRM pairwise   →  release_dir/hbcd_pcrelate_grm_pairwise.tsv
+#   - PC-Relate relatedness    →  release_dir/hbcd_pcrelate_relatedness.tsv
+#   - PC-AiR 32 PCs clean      →  release_dir/hbcd_pcair_32PCs_clean.tsv
+#   - PLINK PCA 32 PCs         →  release_dir/hbcd_plink_pca_32PCs.tsv
+#   - KING relatedness         →  release_dir/hbcd_king_relatedness.tsv
 #
 # Usage: python 28-filter_release_outputs.py [--release-dir /path]
 # Default release from HBCD_RELEASE env var or br_21p2.
@@ -192,7 +198,7 @@ def filter_grm_text_gz(in_path, out_path):
 # ===========================================================================
 print("\n--- GCTA binary GRM ---")
 filter_binary_grm(
-    str(DATA_DIR / "hbcd_gcta_grm"),
+    str(HANDOFF_DIR / "hbcd_gcta_grm"),
     str(RELEASE_DIR / "hbcd_gcta_grm"),
 )
 
@@ -201,8 +207,8 @@ filter_binary_grm(
 # ===========================================================================
 print("\n--- PLINK GRM ---")
 filter_matrix(
-    DATA_DIR / "hbcd_plink_grm.rel",
-    DATA_DIR / "hbcd_plink_grm.rel.id",
+    HANDOFF_DIR / "hbcd_plink_grm.rel",
+    HANDOFF_DIR / "hbcd_plink_grm.rel.id",
     RELEASE_DIR / "hbcd_plink_grm.rel",
     RELEASE_DIR / "hbcd_plink_grm.rel.id",
 )
@@ -214,14 +220,6 @@ print("\n--- PC-AiR ---")
 filter_text(
     DATA_DIR / f"{NAME}_pc_scores.txt", "sample.id",
     RELEASE_DIR / f"{NAME}_pc_scores.txt",
-)
-filter_text(
-    DATA_DIR / f"{NAME}_unrelated_ids.txt", "SampleID",
-    RELEASE_DIR / f"{NAME}_unrelated_ids.txt",
-)
-filter_text(
-    DATA_DIR / f"{NAME}_related_ids.txt", "SampleID",
-    RELEASE_DIR / f"{NAME}_related_ids.txt",
 )
 
 # ===========================================================================
@@ -303,7 +301,7 @@ print("\n--- PC-Relate GRM (binary) ---")
 filter_binary_grm(
     str(HANDOFF_DIR / "hbcd_pcrelate_grm"),
     str(RELEASE_DIR / "hbcd_pcrelate_grm"),
-    id_ext=".id", bin_ext=".bin", n_ext=".N.bin",
+    id_ext=".grm.id", bin_ext=".grm.bin", n_ext=".grm.N.bin",
 )
 
 # ===========================================================================
@@ -343,6 +341,26 @@ filter_text(
     HANDOFF_DIR / "hbcd_pcair_32PCs_clean.tsv",
     "participant_id",
     RELEASE_DIR / "hbcd_pcair_32PCs_clean.tsv",
+)
+
+# ===========================================================================
+# PLINK PCA 32 PCs
+# ===========================================================================
+print("\n--- PLINK PCA 32 PCs ---")
+filter_text(
+    HANDOFF_DIR / "hbcd_plink_pca_32PCs.tsv",
+    "participant_id",
+    RELEASE_DIR / "hbcd_plink_pca_32PCs.tsv",
+)
+
+# ===========================================================================
+# KING relatedness
+# ===========================================================================
+print("\n--- KING relatedness ---")
+filter_csv(
+    HANDOFF_DIR / "hbcd_king_relatedness.tsv",
+    RELEASE_DIR / "hbcd_king_relatedness.tsv",
+    ["subject_id_1", "subject_id_2"],
 )
 
 print("\nDone.")
