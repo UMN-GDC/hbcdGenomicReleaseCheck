@@ -45,17 +45,22 @@ fam = pd.read_csv(
 fam["_idx"] = range(len(fam))
 fam["PHENO"] = "NONE"
 
-# IID is the release_candid (no C/M suffix in the de-identified onlyQc)
-fam["release_candid"] = pd.to_numeric(fam["IID"], errors="coerce")
+# IID = {release_candid}{C|M}; FID = {release_candid}
+fam["release_candid"] = pd.to_numeric(fam["IID"].astype(str).str[:-1], errors="coerce")
+fam["_orig_rel"] = fam["IID"].str[-1]
 
 # -- merge to get de-identified IDs --
 combined = fam.merge(identifiers, how="left", on="release_candid")
 combined = combined.merge(batch, how="left", on="release_candid")
+rel_ok = combined["relationship"].isna() | (
+    combined["relationship"] == combined["_orig_rel"]
+)
+combined = combined[rel_ok]
 combined = combined.drop_duplicates(subset="_idx")
 
 # -- de-identified FID / IID for ALL subjects --
 combined["new_FID"] = pd.to_numeric(combined["release_candid"], errors="coerce").fillna(0).astype(int)
-combined["new_rel"] = combined["relationship"].fillna("")
+combined["new_rel"] = combined["relationship"].fillna(combined["_orig_rel"])
 has_rc = combined["release_candid"].notna()
 combined["new_IID"] = combined["new_FID"].astype(str) + combined["new_rel"]
 combined.loc[~has_rc, "new_IID"] = (
