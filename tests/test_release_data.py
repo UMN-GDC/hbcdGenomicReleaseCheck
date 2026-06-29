@@ -393,10 +393,10 @@ def _release_iids():
 
 
 def test_pcrelate_grm_ids_are_release():
-    """All IIDs in hbcd_pcrelate_grm.id are release IIDs."""
-    p = RELEASE_DIR / "hbcd_pcrelate_grm.id"
+    """All IIDs in hbcd_pcrelate_grm.grm.id are release IIDs."""
+    p = RELEASE_DIR / "hbcd_pcrelate_grm.grm.id"
     if not p.exists():
-        pytest.skip("hbcd_pcrelate_grm.id not found")
+        pytest.skip("hbcd_pcrelate_grm.grm.id not found")
     ids = pd.read_csv(p, sep=r"\s+", header=None, names=["FID", "IID"], dtype=str)
     iids = set(ids["IID"])
     extra = iids - _release_iids()
@@ -407,11 +407,11 @@ def test_pcrelate_grm_ids_are_release():
 
 
 def test_pcrelate_grm_dimensions():
-    """hbcd_pcrelate_grm.id row count matches hbcd.fam."""
+    """hbcd_pcrelate_grm.grm.id row count matches hbcd.fam."""
     n = _release_n_subjects()
-    p = RELEASE_DIR / "hbcd_pcrelate_grm.id"
+    p = RELEASE_DIR / "hbcd_pcrelate_grm.grm.id"
     if not p.exists():
-        pytest.skip("hbcd_pcrelate_grm.id not found")
+        pytest.skip("hbcd_pcrelate_grm.grm.id not found")
     ids = pd.read_csv(p, sep=r"\s+", header=None, names=["FID", "IID"])
     assert len(ids) == n, (
         f"pcrelate_grm.id: {len(ids)} rows, expected {n}"

@@ -207,8 +207,8 @@ def _check_file(path, label, id_cols, reader="csv"):
 # ── PC-Relate GRM binary ──────────────────────────────────────────────────
 
 _check_file(
-    RELEASE_DIR / "hbcd_pcrelate_grm.id",
-    "hbcd_pcrelate_grm.id",
+    RELEASE_DIR / "hbcd_pcrelate_grm.grm.id",
+    "hbcd_pcrelate_grm.grm.id",
     ["0", "1"],  # FID, IID — headerless
     reader="fwf",
 )
