@@ -43,7 +43,7 @@ fam = pd.read_csv(
     names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
 )
 fam["_idx"] = range(len(fam))
-fam["pscid"] = fam["IID"].astype(str)
+fam["pscid"] = fam["IID"].astype(str).str[:-1]  # strip C/M suffix
 fam["_orig_rel"] = fam["IID"].str[-1]
 fam["PHENO"] = "NONE"
 
