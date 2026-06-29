@@ -209,7 +209,7 @@ def _check_file(path, label, id_cols, reader="csv"):
 _check_file(
     RELEASE_DIR / "hbcd_pcrelate_grm.grm.id",
     "hbcd_pcrelate_grm.grm.id",
-    ["0", "1"],  # FID, IID — headerless
+    ["1"],  # IID only (col 1) — FID is release_candid, not an IID
     reader="fwf",
 )
 
