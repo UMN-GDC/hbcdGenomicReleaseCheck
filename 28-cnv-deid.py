@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # step 28: de-identify CNV_slim_clean.txt — map pscid → release_candid
-# Writes de-identified CNV back to data_handoff for downstream filtering.
+# Writes de-identified CNV to release_base for downstream filtering.
 # CNV sample_id format:  ..._<pscid><C|M>
 #   e.g.  "GSM0000000_Grn_12345C" → pscid=12345, type=C
 #
