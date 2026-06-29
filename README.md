@@ -55,7 +55,7 @@ file that was never de-identified (CNV).
 
 | # | Script | Input | Output |
 |---|--------|-------|--------|
-| 25 | `filterGenotypeFiles.py` | de-IDed `onlyQc.{bed,bim,fam}`, identifiers, exclusions | `keep_list.txt`, `temp.fam`, `batch.info`, `Removed_individuals.txt` |
+| 25 | `filterGenotypeFiles.py` | de-IDed `onlyQc.{bed,bim,fam}`, identifiers, exclusions | `keep_list.txt`, `temp.fam`, `batch.info` | `Removed_individuals.txt` → release dir |
 | 26 | `run_plink_filter.sh` | `onlyQc`, `temp.fam`, `keep_list.txt` | `hbcd.{bed,bim,fam}` |
 | 27 | `filter_imputed_vcf.SLURM` | imputed VCFs (c1/c2/c3/cX), `keep_list.txt` | filtered `imputed/chr*.dose.vcf.gz` |
 | 28 | `filter_release_outputs.py` | de-IDed derivatives in `data/`, `keep_list.txt` | filtered GRM/PC-AiR/PC-Relate files in release `data/` |
@@ -88,7 +88,7 @@ export HBCD_RELEASE=br_21p2
 #   │   └── imputed/     # per-chromosome dose VCFs
 #   ├── keep_list.txt
 #   ├── temp.fam
-#   └── Removed_individuals.txt
+    └── Removed_individuals.txt
 ```
 
 To use a different release:

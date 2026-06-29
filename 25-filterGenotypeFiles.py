@@ -170,7 +170,7 @@ exc["IID"] = (
     + exc["relationship"].fillna("")
 )
 exc[["IID"]].drop_duplicates().to_csv(
-    release_base / "Removed_individuals.txt",
+    release_dir / "Removed_individuals.txt",
     sep=" ",
     index=False,
     header=False,

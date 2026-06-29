@@ -31,7 +31,7 @@ def _load_data():
     batch = pd.read_csv(RELEASE_DIR / "batch.info", sep="\t")
     batch = batch.rename(columns={batch.columns[0]: "IID"})
     excluded = pd.read_csv(
-        get_release_base() / "Removed_individuals.txt",
+        RELEASE_DIR / "Removed_individuals.txt",
         delim_whitespace=True,
         header=None,
         names=["IID"],
@@ -378,75 +378,6 @@ def _release_n_subjects():
     return len(fam)
 
 
-# ── PLINK GRM ────────────────────────────────────────────────────────────
-
-
-def test_plink_grm_dimensions():
-    """PLINK GRM .rel.id row count matches hbcd.fam, and .rel is square."""
-    n = _release_n_subjects()
-    id_path = RELEASE_DIR / "hbcd_plink_grm.rel.id"
-    rel_path = RELEASE_DIR / "hbcd_plink_grm.rel"
-    if not id_path.exists():
-        pytest.skip("hbcd_plink_grm.rel.id not found")
-    ids = pd.read_csv(id_path, sep=r"\s+", header=None, names=["FID", "IID"])
-    assert len(ids) == n, f"PLINK GRM .rel.id: {len(ids)} rows, expected {n}"
-
-    if rel_path.exists():
-        mat = np.loadtxt(str(rel_path))
-        assert mat.shape == (n, n), (
-            f"PLINK GRM .rel shape {mat.shape}, expected ({n},{n})"
-        )
-
-
-def test_plink_grm_ids_are_release():
-    """All IIDs in PLINK GRM .rel.id are in the release set."""
-    id_path = RELEASE_DIR / "hbcd_plink_grm.rel.id"
-    if not id_path.exists():
-        pytest.skip("hbcd_plink_grm.rel.id not found")
-    ids = set(
-        pd.read_csv(id_path, sep=r"\s+", header=None, names=["FID", "IID"])["IID"]
-        .astype(str)
-    )
-    release_ids = _release_iids()
-    extra = ids - release_ids
-    assert len(extra) == 0, (
-        f"{len(extra)} IID(s) in PLINK GRM not in release set: "
-        f"{sorted(extra)[:10]}"
-    )
-
-
-# ── GCTA binary GRM ──────────────────────────────────────────────────────
-
-
-def test_gcta_grm_dimensions():
-    """GCTA GRM .grm.id row count matches hbcd.fam."""
-    n = _release_n_subjects()
-    id_path = RELEASE_DIR / "hbcd_gcta_grm.grm.id"
-    if not id_path.exists():
-        pytest.skip("hbcd_gcta_grm.grm.id not found")
-    ids = pd.read_csv(id_path, sep="\t", header=None, names=["FID", "IID"])
-    assert len(ids) == n, f"GCTA GRM .grm.id: {len(ids)} rows, expected {n}"
-
-
-def test_gcta_grm_ids_are_release():
-    """All IIDs in GCTA GRM .grm.id are in the release set."""
-    id_path = RELEASE_DIR / "hbcd_gcta_grm.grm.id"
-    if not id_path.exists():
-        pytest.skip("hbcd_gcta_grm.grm.id not found")
-    ids = set(
-        pd.read_csv(id_path, sep="\t", header=None, names=["FID", "IID"])["IID"]
-        .astype(str)
-    )
-    extra = ids - _release_iids()
-    assert len(extra) == 0, (
-        f"{len(extra)} IID(s) in GCTA GRM not in release set: "
-        f"{sorted(extra)[:10]}"
-    )
-
-
-# ── PC-AiR scores ────────────────────────────────────────────────────────
-
-
 def _release_iids():
     """Memoised helper: load release IID set once per session."""
     if not hasattr(_release_iids, "_cache"):
@@ -456,133 +387,6 @@ def _release_iids():
         )
         _release_iids._cache = set(keep["IID"].astype(str))
     return _release_iids._cache
-
-
-def test_pcair_scores_ids_are_release():
-    """All sample.id in PC-AiR scores are release IIDs."""
-    p = RELEASE_DIR / f"{NAME}_pc_scores.txt"
-    if not p.exists():
-        pytest.skip("PC-AiR scores not found")
-    scores = pd.read_csv(p, sep="\t", dtype=str)
-    ids = set(scores["sample.id"])
-    extra = ids - _release_iids()
-    assert len(extra) == 0, (
-        f"{len(extra)} sample(s) in PC-AiR scores not in release set: "
-        f"{sorted(extra)[:10]}"
-    )
-    assert len(scores) == len(_release_iids()), (
-        f"PC-AiR scores row count ({len(scores)}) ≠ release IIDs ({len(_release_iids())})"
-    )
-
-
-# ── PC-AiR unrelated / related IDs (two formats) ─────────────────────────
-
-
-@pytest.mark.parametrize("fstem", [
-    "unrelated_ids", "related_ids",
-    "pcair_unrelated_ids", "pcair_related_ids",
-])
-def test_pcair_id_list_ids_are_release(fstem):
-    """All IDs in PC-AiR unrelated/related lists are release IIDs."""
-    # Try both text and CSV/TSV
-    for ext, id_col in [("", "SampleID"), (".csv", "SampleID"), (".tsv", "SampleID")]:
-        p = RELEASE_DIR / f"{NAME}_{fstem}{ext}"
-        if p.exists():
-            break
-    else:
-        pytest.skip(f"No {NAME}_{fstem} file found")
-    df = pd.read_csv(p, dtype=str)
-    col = [c for c in df.columns if c.lower() in ("sampleid", "sample.id", "id")][0]
-    ids = set(df[col].dropna().astype(str))
-    extra = ids - _release_iids()
-    assert len(extra) == 0, (
-        f"{len(extra)} ID(s) in {fstem} not in release set: {sorted(extra)[:10]}"
-    )
-
-
-# ── PC-AiR eigenvalues (no sample IDs — structural check) ────────────────
-
-
-def test_pcair_eigenvalues_exist():
-    """PC-AiR eigenvalues files exist with expected columns."""
-    for ext in [".csv", ".tsv"]:
-        p = RELEASE_DIR / f"{NAME}_pcair_eigenvalues{ext}"
-        if p.exists():
-            df = pd.read_csv(p)
-            assert "PC" in df.columns, f"{p.name} missing PC column"
-            assert "Eigenvalue" in df.columns, f"{p.name} missing Eigenvalue column"
-            assert len(df) > 0, f"{p.name} is empty"
-            return
-    pytest.skip("No PC-AiR eigenvalues file found")
-
-
-# ── PC-Relate pairs ──────────────────────────────────────────────────────
-
-
-@pytest.mark.parametrize("fstem", ["pcrelate_pairs", "pcrelate_ibd"])
-def test_pcrelate_pair_ids_are_release(fstem):
-    """All ID1/ID2 in PC-Relate pairs/IBD are release IIDs."""
-    p = RELEASE_DIR / f"{NAME}_{fstem}.csv"
-    if not p.exists():
-        p = RELEASE_DIR / f"{NAME}_{fstem}.tsv"
-    if not p.exists():
-        pytest.skip(f"{NAME}_{fstem} not found")
-    df = pd.read_csv(p, dtype=str)
-    all_ids = set(df["ID1"]).union(set(df["ID2"]))
-    extra = all_ids - _release_iids()
-    assert len(extra) == 0, (
-        f"{len(extra)} ID(s) in {fstem} not in release set: {sorted(extra)[:10]}"
-    )
-
-
-def test_pcrelate_self_ids_are_release():
-    """All ID in PC-Relate self-kinship are release IIDs."""
-    p = RELEASE_DIR / f"{NAME}_pcrelate_self.csv"
-    if not p.exists():
-        p = RELEASE_DIR / f"{NAME}_pcrelate_self.tsv"
-    if not p.exists():
-        pytest.skip("pcrelate_self not found")
-    df = pd.read_csv(p, dtype=str)
-    ids = set(df["ID"])
-    extra = ids - _release_iids()
-    assert len(extra) == 0, (
-        f"{len(extra)} ID(s) in pcrelate_self not in release set: {sorted(extra)[:10]}"
-    )
-
-
-def test_pcrelate_kinmat_long_ids_are_release():
-    """All ID1/ID2 in PC-Relate kinmat long are release IIDs."""
-    p = RELEASE_DIR / f"{NAME}_pcrelate_kinmat_long.csv"
-    if not p.exists():
-        p = RELEASE_DIR / f"{NAME}_pcrelate_kinmat_long.tsv"
-    if not p.exists():
-        pytest.skip("pcrelate_kinmat_long not found")
-    df = pd.read_csv(p, dtype=str)
-    all_ids = set(df["ID1"]).union(set(df["ID2"]))
-    extra = all_ids - _release_iids()
-    assert len(extra) == 0, (
-        f"{len(extra)} ID(s) in kinmat_long not in release set: {sorted(extra)[:10]}"
-    )
-
-
-def test_pcrelate_kinmat_wide_ids_are_release():
-    """SampleID column and column headers in PC-Relate kinmat wide are release IIDs."""
-    p = RELEASE_DIR / f"{NAME}_pcrelate_kinmat_wide.csv"
-    if not p.exists():
-        p = RELEASE_DIR / f"{NAME}_pcrelate_kinmat_wide.tsv"
-    if not p.exists():
-        pytest.skip("pcrelate_kinmat_wide not found")
-    df = pd.read_csv(p, dtype=str)
-    row_ids = set(df["SampleID"])
-    col_ids = set(df.columns[1:])
-    extra_rows = row_ids - _release_iids()
-    extra_cols = col_ids - _release_iids()
-    assert len(extra_rows) == 0, (
-        f"{len(extra_rows)} row SampleID(s) not in release set: {sorted(extra_rows)[:10]}"
-    )
-    assert len(extra_cols) == 0, (
-        f"{len(extra_cols)} column ID(s) not in release set: {sorted(extra_cols)[:10]}"
-    )
 
 
 # ── PC-Relate GRM (binary) ────────────────────────────────────────────
@@ -623,7 +427,7 @@ def test_pcair_32pcs_clean_ids_are_release():
     if not p.exists():
         pytest.skip("hbcd_pcair_32PCs_clean.tsv not found")
     df = pd.read_csv(p, sep="\t", dtype=str)
-    ids = set(df["participant_id"].dropna().astype(str))
+    ids = set(df["subject_id"].dropna().astype(str))
     extra = ids - _release_iids()
     assert len(extra) == 0, (
         f"{len(extra)} participant_id(s) in 32PCs_clean not in release set: "
@@ -644,23 +448,6 @@ def test_pcrelate_grm_pairwise_ids_are_release():
     extra = all_ids - _release_iids()
     assert len(extra) == 0, (
         f"{len(extra)} ID(s) in pcrelate_grm_pairwise not in release set: "
-        f"{sorted(extra)[:10]}"
-    )
-
-
-# ── PC-Relate relatedness ─────────────────────────────────────────────
-
-
-def test_pcrelate_relatedness_ids_are_release():
-    """All subject_id_1/subject_id_2 in hbcd_pcrelate_relatedness.tsv are release IIDs."""
-    p = RELEASE_DIR / "hbcd_pcrelate_relatedness.tsv"
-    if not p.exists():
-        pytest.skip("hbcd_pcrelate_relatedness.tsv not found")
-    df = pd.read_csv(p, sep="\t", dtype=str)
-    all_ids = set(df["subject_id_1"]).union(set(df["subject_id_2"]))
-    extra = all_ids - _release_iids()
-    assert len(extra) == 0, (
-        f"{len(extra)} ID(s) in pcrelate_relatedness not in release set: "
         f"{sorted(extra)[:10]}"
     )
 

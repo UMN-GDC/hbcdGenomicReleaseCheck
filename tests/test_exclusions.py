@@ -115,7 +115,7 @@ def test_removed_individuals_absent():
     hbcd = _load_hbcd_fam()
     fam_iids = _fam_iids(hbcd)
 
-    p = get_release_base() / "Removed_individuals.txt"
+    p = get_release_dir() / "Removed_individuals.txt"
     if not p.exists():
         pytest.skip("Removed_individuals.txt not found")
     removed = pd.read_csv(p, delim_whitespace=True, header=None, names=["IID"])

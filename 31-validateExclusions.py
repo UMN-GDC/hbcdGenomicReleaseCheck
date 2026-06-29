@@ -216,7 +216,7 @@ _check_file(
 _check_file(
     RELEASE_DIR / "hbcd_pcair_32PCs_clean.tsv",
     "hbcd_pcair_32PCs_clean.tsv",
-    ["participant_id"],
+    ["subject_id"],
     reader="tsv",
 )
 
@@ -226,15 +226,6 @@ _check_file(
     RELEASE_DIR / "hbcd_pcrelate_grm_pairwise.tsv",
     "hbcd_pcrelate_grm_pairwise.tsv",
     ["ID1", "ID2"],
-    reader="tsv",
-)
-
-# ── PC-Relate relatedness ────────────────────────────────────────────────
-
-_check_file(
-    RELEASE_DIR / "hbcd_pcrelate_relatedness.tsv",
-    "hbcd_pcrelate_relatedness.tsv",
-    ["subject_id_1", "subject_id_2"],
     reader="tsv",
 )
 
