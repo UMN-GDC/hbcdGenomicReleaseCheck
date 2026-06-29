@@ -306,8 +306,8 @@ def test_filter_correctness():
     temp["_rel"] = temp["IID"].astype(str).str[-1]
 
     input_batch = pd.read_csv(RELEASE_DIR / "batch.info", sep="\t")
-    input_batch["_rel"] = input_batch["relationship"]
-    input_batch["_rc"] = pd.to_numeric(input_batch["release_candid"])
+    input_batch["_rel"] = input_batch["IID"].str[-1]
+    input_batch["_rc"] = pd.to_numeric(input_batch["IID"].str[:-1])
 
     merged = temp.merge(
         input_batch,
