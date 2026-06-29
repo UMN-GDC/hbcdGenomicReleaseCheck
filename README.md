@@ -32,13 +32,8 @@ python 29-filter_release_outputs.py
 # ── 3. Validate ─────────────────────────────────────────────────────
 # Confirm no excluded subject leaked into any output file.
 
-# Step 30 — Exclusion validation:
+# Step 30 — Exclusion validation + tests:
 python 30-validateExclusions.py
-
-# Step 31 — CNV QC report (optional):
-sbatch 31-cnv-qc-report.SLURM
-
-# Step 32 — Run tests:
 pytest tests/ -v
 ```
 
@@ -103,7 +98,6 @@ file that was never de-identified (CNV).
 | 28 | `cnv-deid.py` | **De-ID** | `data_handoff/CNV_slim_clean.txt`, identifiers | de-IDed `data_handoff/CNV_slim_clean_deid.txt` |
 | 29 | `filter_release_outputs.py` | Filter | de-IDed handoff files, `keep_list.txt` | filtered GRM/PC-AiR/CNV files in release dir |
 | 30 | `validateExclusions.py` | — | all release output files | console validation report |
-| 31 | `cnv-qc-report.{qmd,SLURM}` | — | `data_handoff/CNV_slim.txt`, demographics, identifiers | HTML genomic profile report (rolling median per chr × race × type) |
 
 ## Release directory
 
@@ -261,7 +255,7 @@ conda run -n python python 29-filter_release_outputs.py
 
 ---
 
-## Phase C, step 31: CNV genomic profile report
+## Phase A/B, step 17: CNV genomic profile report (pre-release)
 
 A Quarto document rendered on SLURM that produces
 an HTML report of CNV quality metrics.  For each CNV probe, the report plots
@@ -271,9 +265,9 @@ each chromosome, faceted by chromosome with independent scales via
 subject type (C = child, M = mother).
 
 ```bash
-sbatch 31-cnv-qc-report.SLURM
+sbatch 17-cnv-qc-report.SLURM
 # or render directly:
-quarto render 31-cnv-qc-report.qmd
+quarto render 17-cnv-qc-report.qmd
 ```
 
 ---
