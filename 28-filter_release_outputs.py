@@ -344,7 +344,7 @@ filter_csv(
 print("\n--- PC-AiR 32 PCs clean ---")
 filter_text(
     HANDOFF_DIR / "hbcd_pcair_32PCs_clean.tsv",
-    "participant_id",
+    "subject_id",
     RELEASE_DIR / "hbcd_pcair_32PCs_clean.tsv",
 )
 
