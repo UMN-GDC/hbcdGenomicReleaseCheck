@@ -102,6 +102,7 @@ def filter_csv(in_path, out_path, id_cols, sep=","):
         return
     df = pd.read_csv(in_path, sep=sep, dtype=str)
     before = len(df)
+    print(f"  Columns: {list(df.columns)}")
     mask = df[id_cols].apply(lambda c: c.isin(release_iids)).any(axis=1)
     df = df[mask]
     out_path.parent.mkdir(parents=True, exist_ok=True)
