@@ -30,11 +30,21 @@ if n_exc:
     identifiers = identifiers[~identifiers["pscid"].isin(excluded_pscids)]
 print(f"  Identifiers total              : {len(identifiers):>6}")
 
-# -- batch info --
+# -- batch info (IID = {pscid}{C|M}; map pscid → release_candid) --
 batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
 batch["relationship"] = batch["IID"].str[-1]
-batch["release_candid"] = pd.to_numeric(batch["IID"].str[:-1])
-batch = batch.drop(columns=["IID"])
+batch["pscid"] = batch["IID"].str[:-1]
+pscid_to_rc = (
+    identifiers[["pscid", "release_candid"]]
+    .drop_duplicates()
+    .assign(pscid=lambda x: x["pscid"].astype(str))
+    .set_index("pscid")["release_candid"]
+)
+batch["release_candid"] = batch["pscid"].map(pscid_to_rc)
+n_unmapped = batch["release_candid"].isna().sum()
+if n_unmapped:
+    print(f"  Warning: {n_unmapped} batch pscid(s) unmapped to release_candid")
+batch = batch.drop(columns=["IID", "pscid"])
 print(f"  Batch info total               : {len(batch):>6}")
 
 # -- PLINK .fam (from onlyQc) --
