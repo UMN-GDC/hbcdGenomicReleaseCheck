@@ -305,10 +305,9 @@ def test_filter_correctness():
     temp = _load_temp_fam()
     temp["_rel"] = temp["IID"].astype(str).str[-1]
 
-    input_batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
-    input_batch["_rel"] = input_batch["IID"].str[-1]
-    input_batch["_rc"] = pd.to_numeric(input_batch["IID"].str[:-1])
-    input_batch = input_batch.drop(columns=["IID"])
+    input_batch = pd.read_csv(RELEASE_DIR / "batch.info", sep="\t")
+    input_batch["_rel"] = input_batch["relationship"]
+    input_batch["_rc"] = pd.to_numeric(input_batch["release_candid"])
 
     merged = temp.merge(
         input_batch,
@@ -319,7 +318,6 @@ def test_filter_correctness():
     ok = (
         merged["FID"].isin(valid_rc)
         & merged["visit"].notna()
-        & merged["plate_number"].notna()
     )
     expected_rc = set(merged.loc[ok, "FID"].unique()) - {0}
 

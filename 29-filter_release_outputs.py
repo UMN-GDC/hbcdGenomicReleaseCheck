@@ -105,7 +105,7 @@ def filter_csv(in_path, out_path, id_cols, sep=","):
     mask = df[id_cols].apply(lambda c: c.isin(release_iids)).any(axis=1)
     df = df[mask]
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(out_path, index=False)
+    df.to_csv(out_path, sep=sep, index=False)
     print(f"  {in_path.name}: {before} → {len(df)} rows")
 
 
