@@ -169,7 +169,7 @@ filter_text(
 # CNV slim clean (de-identified by 28-cnv-deid.py)
 # ===========================================================================
 print("\n--- CNV slim clean ---")
-cnv_path = HANDOFF_DIR / "CNV_slim_clean_deid.txt"
+cnv_path = release_base / "CNV_slim_clean_deid.txt"
 if not cnv_path.exists():
     print(f"  SKIP (not found — run 28-cnv-deid.py first): {cnv_path}")
 else:

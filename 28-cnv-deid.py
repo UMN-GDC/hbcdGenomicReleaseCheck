@@ -9,11 +9,11 @@
 
 import sys
 import pandas as pd
-from _lib import DATA_DIR, load_identifiers
+from _lib import DATA_DIR, get_release_base, load_identifiers
 
 CNV_SOURCE_DIR = DATA_DIR.parent / "data_handoff"
 CNV_INPUT = CNV_SOURCE_DIR / "CNV_slim_clean.txt"
-CNV_DEID_OUT = CNV_SOURCE_DIR / "CNV_slim_clean_deid.txt"
+CNV_DEID_OUT = get_release_base() / "CNV_slim_clean_deid.txt"
 
 # ── load identifiers crosswalk ─────────────────────────────────────────
 identifiers = load_identifiers()
