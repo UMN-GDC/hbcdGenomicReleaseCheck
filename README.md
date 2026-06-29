@@ -310,6 +310,39 @@ Step 6 and 7 should run last.
 
 ---
 
+## When the exclusion list changes
+
+If `HBCDexclusions.csv`, the Excel QC sheet, or any other exclusion source is
+updated, **Phase A and B do not need to be re-run** — the underlying
+derivatives (GRM, PC-AiR, PC-Relate, imputation VCFs) still contain all
+QC-passing subjects and remain valid.  Only the release subject subset changes,
+so only Phase C scripts need to be re-executed:
+
+```bash
+# 1. Re-build keep list with updated exclusions
+python 25-filterGenotypeFiles.py
+
+# 2. Re-filter PLINK genotypes
+RELEASE_DIR=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_${HBCD_RELEASE}/data \
+  ./26-run_plink_filter.sh
+
+# 3–5. Re-filter everything (independent of each other)
+sbatch 27-filter_imputed_vcf.SLURM          # VCFs
+python 28-filter_release_outputs.py          # derivatives
+python 29-cnv-deid_filter.py                 # CNV (re-maps pscid → RC + re-filters)
+
+# 6–7. Validate
+python 30-validateExclusions.py
+python -m pytest tests/ -v
+```
+
+Step 29 must re-run because the CNV source file (`CNV_slim_clean.txt`) always
+retains raw pscid IDs in `data_handoff/` — the de-identified + filtered copy
+in the release `data/` dir is rebuilt fresh from the original pscid-level data
+each time, using the updated `keep_list.txt`.
+
+---
+
 ## Validation tests
 
 ### `tests/test_release_data.py` — 33+ tests
