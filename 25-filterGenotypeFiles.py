@@ -4,7 +4,6 @@
 # source /projects/standard/basu_hbcd/shared/.venv/bin/activate
 
 import pandas as pd
-from pathlib import Path
 
 from _lib import (
     DATA_DIR,
@@ -17,7 +16,7 @@ from _lib import (
     load_additional_excluded_pscids,
 )
 
-data_prefix = Path("onlyQc")
+data_prefix = DATA_DIR / "onlyQc"
 release_dir = get_release_dir()
 release_dir.mkdir(parents=True, exist_ok=True)
 release_base = get_release_base()
