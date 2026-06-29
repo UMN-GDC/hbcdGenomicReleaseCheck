@@ -14,7 +14,6 @@
 #   - PC-Relate GRM pairwise   →  release_dir/hbcd_pcrelate_grm_pairwise.tsv
 #   - PC-Relate relatedness    →  release_dir/hbcd_pcrelate_relatedness.tsv
 #   - PC-AiR 32 PCs clean      →  release_dir/hbcd_pcair_32PCs_clean.tsv
-#   - PLINK PCA 32 PCs         →  release_dir/hbcd_plink_pca_32PCs.tsv
 #   - KING relatedness         →  release_dir/hbcd_king_relatedness.tsv
 #
 # Usage: python 28-filter_release_outputs.py [--release-dir /path]
@@ -346,16 +345,6 @@ filter_text(
     HANDOFF_DIR / "hbcd_pcair_32PCs_clean.tsv",
     "subject_id",
     RELEASE_DIR / "hbcd_pcair_32PCs_clean.tsv",
-)
-
-# ===========================================================================
-# PLINK PCA 32 PCs
-# ===========================================================================
-print("\n--- PLINK PCA 32 PCs ---")
-filter_text(
-    HANDOFF_DIR / "hbcd_plink_pca_32PCs.tsv",
-    "participant_id",
-    RELEASE_DIR / "hbcd_plink_pca_32PCs.tsv",
 )
 
 # ===========================================================================
