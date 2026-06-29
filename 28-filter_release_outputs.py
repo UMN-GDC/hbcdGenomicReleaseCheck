@@ -142,12 +142,12 @@ def filter_binary_grm(in_prefix, out_prefix, id_ext=".grm.id", bin_ext=".grm.bin
         print(f"  {n_in.name}: {n}x{n} → {n_keep}x{n_keep}")
 
 
-def filter_csv(in_path, out_path, id_cols):
-    """Filter a CSV keeping rows where any *id_cols* matches a release IID."""
+def filter_csv(in_path, out_path, id_cols, sep=","):
+    """Filter a CSV/TSV keeping rows where any *id_cols* matches a release IID."""
     if not in_path.exists():
         print(f"  SKIP (not found): {in_path}")
         return
-    df = pd.read_csv(in_path, dtype=str)
+    df = pd.read_csv(in_path, sep=sep, dtype=str)
     before = len(df)
     mask = df[id_cols].apply(lambda c: c.isin(release_iids)).any(axis=1)
     df = df[mask]
@@ -156,12 +156,12 @@ def filter_csv(in_path, out_path, id_cols):
     print(f"  {in_path.name}: {before} → {len(df)} rows")
 
 
-def filter_kinmat_wide(in_path, out_path):
+def filter_kinmat_wide(in_path, out_path, sep=","):
     """Filter a wide-format kinship matrix CSV keeping only release columns/rows."""
     if not in_path.exists():
         print(f"  SKIP (not found): {in_path}")
         return
-    df = pd.read_csv(in_path, dtype=str)
+    df = pd.read_csv(in_path, sep=sep, dtype=str)
     cols = ["SampleID"] + [c for c in df.columns[1:] if c in release_iids]
     df = df[df["SampleID"].isin(release_iids)][cols]
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -241,6 +241,7 @@ for ext in ["csv", "tsv"]:
         DATA_DIR / f"{NAME}_pcair_scores.{ext}",
         RELEASE_DIR / f"{NAME}_pcair_scores.{ext}",
         ["SampleID"],
+        sep="\t" if ext == "tsv" else ",",
     )
 
 # ===========================================================================
@@ -253,6 +254,7 @@ for fstem in ["pcair_unrelated_ids", "pcair_related_ids"]:
             DATA_DIR / f"{NAME}_{fstem}.{ext}",
             RELEASE_DIR / f"{NAME}_{fstem}.{ext}",
             ["SampleID"],
+            sep="\t" if ext == "tsv" else ",",
         )
 
 # ===========================================================================
@@ -260,20 +262,21 @@ for fstem in ["pcair_unrelated_ids", "pcair_related_ids"]:
 # ===========================================================================
 print("\n--- PC-Relate pairs ---")
 for ext in ["csv", "tsv"]:
+    sep = "\t" if ext == "tsv" else ","
     filter_csv(
         DATA_DIR / f"{NAME}_pcrelate_pairs.{ext}",
         RELEASE_DIR / f"{NAME}_pcrelate_pairs.{ext}",
-        ["ID1", "ID2"],
+        ["ID1", "ID2"], sep=sep,
     )
     filter_csv(
         DATA_DIR / f"{NAME}_pcrelate_ibd.{ext}",
         RELEASE_DIR / f"{NAME}_pcrelate_ibd.{ext}",
-        ["ID1", "ID2"],
+        ["ID1", "ID2"], sep=sep,
     )
     filter_csv(
         DATA_DIR / f"{NAME}_pcrelate_self.{ext}",
         RELEASE_DIR / f"{NAME}_pcrelate_self.{ext}",
-        ["ID"],
+        ["ID"], sep=sep,
     )
 
 # ===========================================================================
@@ -285,6 +288,7 @@ for ext in ["csv", "tsv"]:
         DATA_DIR / f"{NAME}_pcrelate_kinmat_long.{ext}",
         RELEASE_DIR / f"{NAME}_pcrelate_kinmat_long.{ext}",
         ["ID1", "ID2"],
+        sep="\t" if ext == "tsv" else ",",
     )
 
 print("\n--- PC-Relate kinmat wide ---")
@@ -292,6 +296,7 @@ for ext in ["csv", "tsv"]:
     filter_kinmat_wide(
         DATA_DIR / f"{NAME}_pcrelate_kinmat_wide.{ext}",
         RELEASE_DIR / f"{NAME}_pcrelate_kinmat_wide.{ext}",
+        sep="\t" if ext == "tsv" else ",",
     )
 
 # ===========================================================================
@@ -320,7 +325,7 @@ print("\n--- PC-Relate GRM pairwise ---")
 filter_csv(
     HANDOFF_DIR / "hbcd_pcrelate_grm_pairwise.tsv",
     RELEASE_DIR / "hbcd_pcrelate_grm_pairwise.tsv",
-    ["ID1", "ID2"],
+    ["ID1", "ID2"], sep="\t",
 )
 
 # ===========================================================================
@@ -330,7 +335,7 @@ print("\n--- PC-Relate relatedness ---")
 filter_csv(
     HANDOFF_DIR / "hbcd_pcrelate_relatedness.tsv",
     RELEASE_DIR / "hbcd_pcrelate_relatedness.tsv",
-    ["subject_id_1", "subject_id_2"],
+    ["subject_id_1", "subject_id_2"], sep="\t",
 )
 
 # ===========================================================================
@@ -360,7 +365,7 @@ print("\n--- KING relatedness ---")
 filter_csv(
     HANDOFF_DIR / "hbcd_king_relatedness.tsv",
     RELEASE_DIR / "hbcd_king_relatedness.tsv",
-    ["subject_id_1", "subject_id_2"],
+    ["subject_id_1", "subject_id_2"], sep="\t",
 )
 
 print("\nDone.")
