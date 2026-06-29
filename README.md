@@ -1,11 +1,53 @@
 # HBCD Genomics Release — De-identification & Validation
 
-De-identifies PLINK genotype data, CNV calls, and derivative outputs for
-public release: raw subject IDs are mapped to anonymous `release_candid`
-integers, filtered to subjects present in the parent-visit (par_visit) table
-(minus exclusion lists), and matched with batch metadata.
+## Quick Start — De-ID then Filter
+
+These steps produce the release dataset.  Run **Phase C** scripts in order:
+
+```bash
+# ── 1. De-identify ──────────────────────────────────────────────────
+# Map raw pscid IDs → anonymous release_candid in every source file.
+# This must happen BEFORE filtering so that a 3rd party can safely
+# handle only de-identified data.
+
+# Step 25 — Genotype de-ID + filter (one combined step):
+python 25-filterGenotypeFiles.py
+
+# Step 26 — PLINK2 --keep to produce release bed/bim/fam:
+bash 26-run_plink_filter.sh
+
+# Step 27 — Filter imputed VCFs:
+sbatch 27-filter_imputed_vcf.SLURM
+
+# Step 28 — CNV de-identification only (pscid → release_candid):
+python 28-cnv-deid.py
+
+# ── 2. Filter to release subjects ───────────────────────────────────
+# All files are now de-identified.  Filter every derivative to only
+# the IIDs listed in keep_list.txt.
+
+# Step 29 — Filter all handoff derivatives (GRM, PCs, CNV):
+python 29-filter_release_outputs.py
+
+# ── 3. Validate ─────────────────────────────────────────────────────
+# Confirm no excluded subject leaked into any output file.
+
+# Step 30 — Exclusion validation:
+python 30-validateExclusions.py
+
+# Step 31 — CNV QC report (optional):
+sbatch 31-cnv-qc-report.SLURM
+
+# Step 32 — Run tests:
+pytest tests/ -v
+```
+
+The same pattern applies to any new derivative: **de-ID first** (map pscid →
+release_candid in `data_handoff/`), **then filter** (keep only release IIDs).
 
 ---
+
+## Full pipeline
 
 ## Full pipeline
 
@@ -44,24 +86,24 @@ After this step:
 - Every derivative file (GRM, PC-AiR, PC-Relate) uses the same de-identified IDs
 - The original pscid IDs are no longer present in any `data/` file
 
-This is why step 28 can filter derivatives without re-de-identifying — they
+This is why step 29 can filter derivatives without re-de-identifying — they
 already contain anonymous IDs.
 
-### Phase C — Release filtering (scripts 25–31)
+### Phase C — De-identification & release filtering (scripts 25–32)
 
 These scripts filter the de-identified data to the **release subject subset**
 (par_visit participants minus all exclusion lists) and handle the one external
 file that was never de-identified (CNV).
 
-| # | Script | Input | Output |
-|---|--------|-------|--------|
-| 25 | `filterGenotypeFiles.py` | de-IDed `onlyQc.{bed,bim,fam}`, identifiers, exclusions | `keep_list.txt`, `temp.fam`, `batch.info` | `Removed_individuals.txt` → release dir |
-| 26 | `run_plink_filter.sh` | `onlyQc`, `temp.fam`, `keep_list.txt` | `hbcd.{bed,bim,fam}` |
-| 27 | `filter_imputed_vcf.SLURM` | imputed VCFs (c1/c2/c3/cX), `keep_list.txt` | filtered `imputed/chr*.dose.vcf.gz` |
-| 28 | `filter_release_outputs.py` | de-IDed derivatives in `data/`, `keep_list.txt` | filtered GRM/PC-AiR/PC-Relate files in release `data/` |
-| 29 | `cnv-deid_filter.py` | `data_handoff/CNV_slim_clean.txt`, `keep_list.txt` | de-IDed + filtered `CNV_slim_clean.txt` |
-| 30 | `validateExclusions.py` | all release output files | console validation report |
-| 31 | `cnv-qc-report.{qmd,SLURM}` | `data_handoff/CNV_slim.txt`, demographics, identifiers | HTML genomic profile report (rolling median per chr × race × type) |
+| # | Script | De-ID or Filter | Input | Output |
+|   |--------|----------------|-------|--------|
+| 25 | `filterGenotypeFiles.py` | **De-ID + Filter** | de-IDed `onlyQc.{bed,bim,fam}`, identifiers, exclusions | `keep_list.txt`, `temp.fam`, `batch.info`, `Removed_individuals.txt` |
+| 26 | `run_plink_filter.sh` | Filter | `onlyQc`, `temp.fam`, `keep_list.txt` | `hbcd.{bed,bim,fam}` |
+| 27 | `filter_imputed_vcf.SLURM` | Filter | imputed VCFs (c1/c2/c3/cX), `keep_list.txt` | filtered `imputed/chr*.dose.vcf.gz` |
+| 28 | `cnv-deid.py` | **De-ID** | `data_handoff/CNV_slim_clean.txt`, identifiers | de-IDed `data_handoff/CNV_slim_clean_deid.txt` |
+| 29 | `filter_release_outputs.py` | Filter | de-IDed handoff files, `keep_list.txt` | filtered GRM/PC-AiR/CNV files in release dir |
+| 30 | `validateExclusions.py` | — | all release output files | console validation report |
+| 31 | `cnv-qc-report.{qmd,SLURM}` | — | `data_handoff/CNV_slim.txt`, demographics, identifiers | HTML genomic profile report (rolling median per chr × race × type) |
 
 ## Release directory
 
@@ -76,19 +118,14 @@ export HBCD_RELEASE=br_21p2
 #   ├── data/            # filtered release files
 #   │   ├── hbcd.bed/bim/fam
 #   │   ├── batch.info
-#   │   ├── hbcd_gcta_grm.grm.{id,bin,N.bin}
-#   │   ├── hbcd_plink_grm.rel{.id,}
-#   │   ├── hbcd_rsid_harmonized_pc_scores.txt
-#   │   ├── hbcd_rsid_harmonized_pcrelate_*.{csv,tsv}
-#   │   ├── hbcd_pcrelate_grm.{id,bin,N.bin,gz}
+#   │   ├── hbcd_pcrelate_grm.{grm.id,grm.bin,grm.N.bin,gz}
 #   │   ├── hbcd_pcair_32PCs_clean.tsv
 #   │   ├── hbcd_pcrelate_grm_pairwise.tsv
-#   │   ├── hbcd_pcrelate_relatedness.tsv
 #   │   ├── CNV_slim_clean.txt
+#   │   ├── Removed_individuals.txt
 #   │   └── imputed/     # per-chromosome dose VCFs
 #   ├── keep_list.txt
-#   ├── temp.fam
-    └── Removed_individuals.txt
+#   └── temp.fam
 ```
 
 To use a different release:
@@ -177,68 +214,56 @@ sbatch 27-filter_imputed_vcf.SLURM
 
 ---
 
-## Phase C, step 29: De-identify & filter CNV calls
+## Phase C, step 28: De-identify CNV calls (de-ID only)
 
-CNV is the **only** file that arrives with raw pscid-level IDs — it comes from
-`data_handoff/` (an external source) and was **never** processed through
-Phases A–B.  Hence it needs both de-identification and filtering in this step.
+CNV arrives with raw pscid-level IDs from `data_handoff/` (external source).
+This step maps pscid → `release_candid` **without filtering**, so a 3rd party
+can handle only de-identified data downstream.
 
 Source file: `data_handoff/CNV_slim_clean.txt` — sample IDs are in the format
 `{array}_{channel}_{pscid}{C|M}` (e.g. `GSM0000000_Grn_12345C`).
 
-`29-cnv-deid_filter.py`:
+`28-cnv-deid.py`:
 
 1. Reads `data_handoff/CNV_slim_clean.txt`
 2. Extracts pscid + relationship suffix (C/M) from each `sample_id`
 3. Maps pscid → `release_candid` via the identifiers crosswalk
 4. Builds de-identified IIDs (`{release_candid}{C|M}`)
-5. Filters to only release IIDs (from `keep_list.txt`)
-6. Writes de-identified `CNV_slim_clean.txt` into the release `data/` dir
+5. Writes de-identified `CNV_slim_clean_deid.txt` back to `data_handoff/`
 
 ```bash
-# Default release:
-conda run -n python python 29-cnv-deid_filter.py
-
-# Custom release:
-export HBCD_RELEASE=br_22p0
-conda run -n python python 29-cnv-deid_filter.py
+conda run -n python python 28-cnv-deid.py
 ```
 
 ---
 
-## Phase C, step 28: Filter derivative outputs
+## Phase C, step 29: Filter all handoff derivatives to release subjects
 
-Derivative files in `data/` (GRM, PC-AiR, PC-Relate, relatedness) were
-de-identified in Phase B and contain **all** QC-passing subjects.
-`28-filter_release_outputs.py` reads each derivative, keeps only rows whose
-sample IDs appear in the release IID whitelist (`keep_list.txt`), and writes
-filtered copies to the release directory.  **Originals are never modified.**
+All source files have been de-identified (by Phase B or step 28) and contain
+**all** QC-passing subjects.  `29-filter_release_outputs.py` reads each
+derivative from `data_handoff/`, keeps only rows whose sample IDs appear in
+the release IID whitelist (`keep_list.txt`), and writes filtered copies to
+the release directory.  **Originals are never modified.**
 
 Filtering methods per file type:
 
 | File type | Filter column(s) | Helper |
-|-----------|-----------------|--------|
-| GCTA binary GRM (`hbcd_gcta_grm.grm.*`) | IID | `filter_binary_grm()` |
-| PLINK GRM (`hbcd_plink_grm.rel.*`) | IID | `filter_matrix()` |
-| PC-AiR scores (`*_pc_scores.txt`) | `sample.id` | `filter_text()` |
-| PC-AiR unrelated/related IDs | `SampleID` | `filter_text()` / `filter_csv()` |
-| PC-Relate pairs/IBD/self | `ID1`, `ID2`, `ID` | `filter_csv()` |
-| PC-Relate kinship matrices | `SampleID` | `filter_kinmat_wide()` |
-| **PC-Relate GRM binary** (`hbcd_pcrelate_grm.{id,bin,N.bin}`) | IID | `filter_binary_grm()` |
-| **PC-Relate GRM text** (`hbcd_pcrelate_grm.gz`) | IID1, IID2 | `filter_grm_text_gz()` |
-| **PC-AiR 32 PCs** (`hbcd_pcair_32PCs_clean.tsv`) | `participant_id` | `filter_text()` |
-| **PC-Relate pairwise** (`hbcd_pcrelate_grm_pairwise.tsv`) | `ID1`, `ID2` | `filter_csv()` |
-| **PC-Relate relatedness** (`hbcd_pcrelate_relatedness.tsv`) | `subject_id_1`, `subject_id_2` | `filter_csv()` |
+|-----------|---|--------|
+| PC-Relate GRM binary (`hbcd_pcrelate_grm.grm.*`) | IID | `filter_binary_grm()` |
+| PC-Relate GRM text (`hbcd_pcrelate_grm.gz`) | IID1, IID2 | `filter_grm_text_gz()` |
+| PC-AiR 32 PCs (`hbcd_pcair_32PCs_clean.tsv`) | `subject_id` | `filter_text()` |
+| PC-Relate pairwise (`hbcd_pcrelate_grm_pairwise.tsv`) | `ID1`, `ID2` | `filter_csv()` |
+| CNV (`CNV_slim_clean.txt`) | `sample_id` | inline filter |
 
 ```bash
-conda run -n python python 28-filter_release_outputs.py
+conda run -n python python 29-filter_release_outputs.py
 ```
 
 ---
 
 ## Phase C, step 31: CNV genomic profile report
 
-A Quarto document rendered on SLURM (`31-cnv-qc-report.SLURM`) that produces
+A Quarto document rendered on SLURM that produces
 an HTML report of CNV quality metrics.  For each CNV probe, the report plots
 rolling-median (k = 51) Log R Ratio, B Allele Frequency, and CNV value across
 each chromosome, faceted by chromosome with independent scales via
@@ -255,8 +280,8 @@ quarto render 31-cnv-qc-report.qmd
 
 ## Phase C, step 30: Validate exclusion integrity
 
-The final quality gate.  Reads every output file and checks for contamination
-by excluded subjects:
+The final quality gate (`30-validateExclusions.py`).  Reads every output file
+and checks for contamination by excluded subjects:
 
 - **hbcd.fam** — both FID (release_candid) and IID level
 - **HBCDexclusions.csv** — per-column, mapped to release_candid
@@ -292,11 +317,11 @@ RELEASE_DIR=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_${HBCD_REL
 # 3. Filter imputed VCFs (SLURM array, 24 tasks — chromosomes 1–22 + X)
 sbatch 27-filter_imputed_vcf.SLURM
 
-# 4. Filter already-de-identified derivative outputs
-python 28-filter_release_outputs.py
+# 4. De-identify CNV (the one file that still has raw pscids)
+python 28-cnv-deid.py
 
-# 5. De-identify + filter CNV (the one file that still has raw pscids)
-python 29-cnv-deid_filter.py
+# 5. Filter all de-identified handoff derivatives (GRM, PCs, CNV)
+python 29-filter_release_outputs.py
 
 # 6. Validate every output for excluded-subject contamination
 python 30-validateExclusions.py
@@ -305,8 +330,7 @@ python 30-validateExclusions.py
 python -m pytest tests/ -v
 ```
 
-Steps 3–5 are independent (all depend on step 25–26, but not on each other).
-Step 6 and 7 should run last.
+Steps 3–4 are de-identification; step 5 filters everything.  Steps 6–7 should run last.
 
 ---
 
@@ -328,27 +352,27 @@ RELEASE_DIR=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_${HBCD_REL
 
 # 3–5. Re-filter everything (independent of each other)
 sbatch 27-filter_imputed_vcf.SLURM          # VCFs
-python 28-filter_release_outputs.py          # derivatives
-python 29-cnv-deid_filter.py                 # CNV (re-maps pscid → RC + re-filters)
+python 28-cnv-deid.py                        # CNV de-ID (pscid → release_candid)
+python 29-filter_release_outputs.py          # filter all derivatives + CNV
 
 # 6–7. Validate
 python 30-validateExclusions.py
 python -m pytest tests/ -v
 ```
 
-Step 29 must re-run because the CNV source file (`CNV_slim_clean.txt`) always
-retains raw pscid IDs in `data_handoff/` — the de-identified + filtered copy
-in the release `data/` dir is rebuilt fresh from the original pscid-level data
-each time, using the updated `keep_list.txt`.
+Step 28 must re-run because the CNV source file (`CNV_slim_clean.txt`) always
+retains raw pscid IDs in `data_handoff/` — the de-identified copy is rebuilt
+fresh from the original pscid-level data each time, then step 29 re-filters
+everything together.
 
 ---
 
 ## Validation tests
 
-### `tests/test_release_data.py` — 33+ tests
+### `tests/test_release_data.py`
 
 De-identification integrity, row counts, filter correctness, and per-file
-IID checks for all derivative outputs:
+IID checks for release derivative outputs:
 
 | Test | What it checks |
 |------|----------------|
@@ -366,7 +390,11 @@ IID checks for all derivative outputs:
 | `test_all_output_iids_in_par_visit` | All IIDs pass par_visit + exclusion filter |
 | `test_filter_correctness` | Re-derives expected subject set, confirms match |
 | `test_variant_count_preserved` | .bim variant count unchanged |
-| **GRM/PC/relatedness derivative IID checks** | Every IID in every derivative file is a release IID |
+| `test_pcrelate_grm_ids_are_release` | All IIDs in pcrelate_grm.id are in release set |
+| `test_pcrelate_grm_dimensions` | pcrelate_grm.id rows = hbcd.fam rows |
+| `test_pcair_32pcs_clean_ids_are_release` | All subject_ids in 32PCs_clean are in release set |
+| `test_pcrelate_grm_pairwise_ids_are_release` | All ID1/ID2 in pairwise are in release set |
+| `test_cnv_slim_clean_ids_are_release` | All sample_ids in CNV are in release set |
 
 ### `tests/test_exclusions.py` — 4 tests
 

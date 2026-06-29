@@ -2,6 +2,8 @@
 
 # step 30: validate no excluded subjects appear in any release output file
 # Checks hbcd.fam + all derivative files + CNV for excluded-IID contamination.
+#
+# Usage: python 30-validateExclusions.py [--release-dir /path]
 
 import sys
 from pathlib import Path

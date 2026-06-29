@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-# step 29: de-identify CNV_slim_clean.txt — map pscid → release_candid
-# Writes de-identified CNV to DATA_DIR for downstream filtering.
+# step 28: de-identify CNV_slim_clean.txt — map pscid → release_candid
+# Writes de-identified CNV back to data_handoff for downstream filtering.
 # CNV sample_id format:  ..._<pscid><C|M>
 #   e.g.  "GSM0000000_Grn_12345C" → pscid=12345, type=C
 #
-# Usage: python 29-cnv-deid.py
+# Usage: python 28-cnv-deid.py
 
 import sys
 import pandas as pd
@@ -13,7 +13,7 @@ from _lib import DATA_DIR, load_identifiers
 
 CNV_SOURCE_DIR = DATA_DIR.parent / "data_handoff"
 CNV_INPUT = CNV_SOURCE_DIR / "CNV_slim_clean.txt"
-CNV_DEID_OUT = DATA_DIR / "CNV_slim_clean_deid.txt"
+CNV_DEID_OUT = CNV_SOURCE_DIR / "CNV_slim_clean_deid.txt"
 
 # ── load identifiers crosswalk ─────────────────────────────────────────
 identifiers = load_identifiers()

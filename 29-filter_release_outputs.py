@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 
-# step 28: filter handoff derivatives (PC-Relate GRM, PC-AiR) to release subjects
-# Reads keep_list.txt (release IIDs) and writes filtered copies to the
-# release data directory.
+# step 29: filter all de-identified handoff derivatives to release subjects
+# Reads keep_list.txt (release IIDs) + de-IDed CNV from data_handoff/,
+# writes filtered copies to the release data directory.
 #
 # Filtered outputs:
 #   - PC-Relate GRM (binary)  →  release_dir/hbcd_pcrelate_grm.{grm.id,grm.bin,grm.N.bin}
 #   - PC-Relate GRM (text gz) →  release_dir/hbcd_pcrelate_grm.gz
 #   - PC-Relate GRM pairwise  →  release_dir/hbcd_pcrelate_grm_pairwise.tsv
 #   - PC-AiR 32 PCs clean     →  release_dir/hbcd_pcair_32PCs_clean.tsv
+#   - CNV slim clean          →  release_dir/CNV_slim_clean.txt
 #
-# Usage: python 28-filter_release_outputs.py [--release-dir /path]
+# Usage: python 29-filter_release_outputs.py [--release-dir /path]
 # Default release from HBCD_RELEASE env var or br_21p2.
 
 import sys
@@ -163,5 +164,21 @@ filter_text(
     "subject_id",
     RELEASE_DIR / "hbcd_pcair_32PCs_clean.tsv",
 )
+
+# ===========================================================================
+# CNV slim clean (de-identified by 28-cnv-deid.py)
+# ===========================================================================
+print("\n--- CNV slim clean ---")
+cnv_path = HANDOFF_DIR / "CNV_slim_clean_deid.txt"
+if not cnv_path.exists():
+    print(f"  SKIP (not found — run 28-cnv-deid.py first): {cnv_path}")
+else:
+    cnv = pd.read_csv(cnv_path, sep="\t", dtype=str)
+    before = len(cnv)
+    cnv = cnv[cnv["sample_id"].isin(release_iids)]
+    cnv_out = RELEASE_DIR / "CNV_slim_clean.txt"
+    cnv_out.parent.mkdir(parents=True, exist_ok=True)
+    cnv.to_csv(cnv_out, sep="\t", index=False)
+    print(f"  CNV_slim_clean.txt: {before} → {len(cnv)} rows ({((before - len(cnv)) / before * 100):.1f}% removed)")
 
 print("\nDone.")

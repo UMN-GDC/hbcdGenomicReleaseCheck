@@ -7,4 +7,4 @@
 
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate gdcPipeline
-quarto render 31-cnv-qc-report.qmd
+quarto render "$(dirname "$0")/31-cnv-qc-report.qmd"
