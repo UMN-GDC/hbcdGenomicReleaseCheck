@@ -64,7 +64,7 @@ combined["new_rel"] = combined["relationship"].fillna(combined["_orig_rel"])
 has_rc = combined["release_candid"].notna()
 combined["new_IID"] = combined["new_FID"].astype(str) + combined["new_rel"]
 combined.loc[~has_rc, "new_IID"] = (
-    "0_" + combined.loc[~has_rc, "release_candid"]
+    "0_" + combined.loc[~has_rc, "release_candid"].fillna("unknown").astype(str)
 )
 
 combined = combined.sort_values("_idx")
