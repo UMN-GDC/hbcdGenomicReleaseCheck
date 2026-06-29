@@ -28,12 +28,14 @@ n_exc = identifiers["pscid"].isin(excluded_pscids).sum()
 if n_exc:
     print(f"  Excluding {n_exc} subject(s) from identifiers via HBCDexclusions.csv")
     identifiers = identifiers[~identifiers["pscid"].isin(excluded_pscids)]
+print(f"  Identifiers total              : {len(identifiers):>6}")
 
 # -- batch info --
 batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
 batch["relationship"] = batch["IID"].str[-1]
 batch["release_candid"] = pd.to_numeric(batch["IID"].str[:-1])
 batch = batch.drop(columns=["IID"])
+print(f"  Batch info total               : {len(batch):>6}")
 
 # -- PLINK .fam (from onlyQc) --
 fam = pd.read_csv(
@@ -48,14 +50,25 @@ fam["PHENO"] = "NONE"
 # IID = {release_candid}{C|M}; FID = {release_candid}
 fam["release_candid"] = pd.to_numeric(fam["IID"].astype(str).str[:-1], errors="coerce")
 fam["_orig_rel"] = fam["IID"].str[-1]
+print(f"  onlyQc.fam total               : {len(fam):>6}")
 
 # -- merge to get de-identified IDs --
 combined = fam.merge(identifiers, how="left", on="release_candid")
+n_no_id = combined["pscid"].isna().sum()
+print(f"  Missing identifiers merge      : {n_no_id:>6}")
+
 combined = combined.merge(batch, how="left", on="release_candid")
+n_no_batch = combined["relationship"].isna().sum()
+print(f"  Missing batch.info merge       : {n_no_batch:>6}")
+
 rel_ok = combined["relationship"].isna() | (
     combined["relationship"] == combined["_orig_rel"]
 )
+n_rel_bad = (~rel_ok).sum()
 combined = combined[rel_ok]
+if n_rel_bad:
+    print(f"  Relationship mismatch removed  : {n_rel_bad:>6}")
+
 combined = combined.drop_duplicates(subset="_idx")
 
 # -- de-identified FID / IID for ALL subjects --
@@ -69,7 +82,7 @@ combined.loc[~has_rc, "new_IID"] = (
 
 combined = combined.sort_values("_idx")
 
-# -- write temp.fam --
+# -- write temp.fam (all subjects, preserves row count) --
 combined[["new_FID", "new_IID", "PAT", "MAT", "SEX", "PHENO"]].to_csv(
     release_base / "temp.fam",
     sep=" ",
@@ -77,10 +90,13 @@ combined[["new_FID", "new_IID", "PAT", "MAT", "SEX", "PHENO"]].to_csv(
     header=False,
     na_rep="NA",
 )
+print(f"  Wrote temp.fam                 : {len(combined):>6}")
 
 # -- single inclusive filter: valid = par_visit \ excluded --
 par_candids = load_par_visit_candids()
 exc_release_candids = load_excluded_release_candids()
+print(f"  Par_visit candids              : {len(par_candids):>6}")
+print(f"  Excel-excluded release_candids : {len(exc_release_candids):>6}")
 
 valid_release_candids = (
     set(
@@ -93,11 +109,25 @@ valid_release_candids = (
     )
     - exc_release_candids
 )
+print(f"  Valid release_candids          : {len(valid_release_candids):>6}")
 
+n_not_par = (~combined["release_candid"].isin(valid_release_candids)).sum()
 combined["_valid"] = combined["release_candid"].isin(valid_release_candids)
-valid = combined[combined["_valid"]].dropna(subset=["visit", "plate_number"])
+print(f"  Not in valid_release_candids   : {n_not_par:>6}")
+
+valid = combined[combined["_valid"]]
+n_no_meta = valid["visit"].isna().sum() + valid["plate_number"].isna().sum()
+valid = valid.dropna(subset=["visit", "plate_number"])
+if n_no_meta:
+    print(f"  Missing visit/plate_number     : {n_no_meta:>6}")
+
 valid = valid.sort_values("_idx")
+n_dup = len(valid) - len(valid.drop_duplicates(subset="new_IID"))
 valid = valid.drop_duplicates(subset="new_IID")
+if n_dup:
+    print(f"  Duplicate IIDs removed         : {n_dup:>6}")
+
+print(f"  Release subjects (keep_list)   : {len(valid):>6}")
 
 # -- write keep_list.txt --
 valid[["new_FID", "new_IID"]].to_csv(
@@ -128,3 +158,4 @@ exc[["IID"]].drop_duplicates().to_csv(
     index=False,
     header=False,
 )
+print(f"  Removed_individuals.txt        : {len(exc):>6}")
