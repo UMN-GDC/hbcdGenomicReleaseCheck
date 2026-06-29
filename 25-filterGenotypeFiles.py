@@ -32,6 +32,12 @@ print(f"  Identifiers total              : {len(identifiers):>6}")
 
 # -- batch info (IID = {pscid}{C|M}; map pscid → release_candid) --
 batch = pd.read_csv(DATA_DIR / "batch.info", sep=r"\s+")
+n_raw = len(batch)
+valid_iid = batch["IID"].astype(str).str.match(r"^\d+[CM]$")
+n_dropped = n_raw - valid_iid.sum()
+if n_dropped:
+    print(f"  Dropped {n_dropped} batch row(s) with non-standard IID")
+    batch = batch[valid_iid].copy()
 batch["relationship"] = batch["IID"].str[-1]
 batch["pscid"] = batch["IID"].str[:-1]
 pscid_to_rc = (
@@ -44,8 +50,9 @@ batch["release_candid"] = batch["pscid"].map(pscid_to_rc)
 n_unmapped = batch["release_candid"].isna().sum()
 if n_unmapped:
     print(f"  Warning: {n_unmapped} batch pscid(s) unmapped to release_candid")
+    batch = batch.dropna(subset=["release_candid"])
 batch = batch.drop(columns=["IID", "pscid"])
-print(f"  Batch info total               : {len(batch):>6}")
+print(f"  Batch info usable              : {len(batch):>6}")
 
 # -- PLINK .fam (from onlyQc) --
 fam = pd.read_csv(
