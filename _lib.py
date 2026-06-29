@@ -29,7 +29,7 @@ def get_release_base(release=None):
 
 
 PAR_VISIT_FILE = "par_visit_data_br21_1.tsv"
-IDENTIFIERS_FILE = "release_identifiers_20260526.csv"
+IDENTIFIERS_FILE = "release_identifiers_20260628.csv"
 EXCLUSION_FILE = "HBCD_genetics_QC1_missing_race_LORIS.xlsx"
 
 

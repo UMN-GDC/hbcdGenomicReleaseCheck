@@ -30,7 +30,7 @@ race_colors <- c("WHT" = "#1f78b4", "BLK" = "#e31a1c", "AIAN" = "#33a02c",
 dm <- read_tsv(DEMO_FILE, show_col_types = FALSE) |>
   mutate(participant_id = str_remove(participant_id, "^sub-"))
 
-IDENTIFIERS_FILE <- "/projects/standard/basu_hbcd/shared/data/release_identifiers_20260526.csv"
+IDENTIFIERS_FILE <- "/projects/standard/basu_hbcd/shared/data/release_identifiers_20260628.csv"
 ids <- read_csv(IDENTIFIERS_FILE, show_col_types = FALSE) %>%
   filter(release_candid != "release_candid") %>%
   distinct(pscid, release_candid)

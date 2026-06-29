@@ -42,7 +42,7 @@ _sep("Loading exclusions")
 excluded_pscids = load_additional_excluded_pscids()
 print(f"  HBCDexclusions.csv pscids           : {len(excluded_pscids):>6}")
 
-identifiers = pd.read_csv(DATA_DIR / "release_identifiers_20260526.csv")
+identifiers = pd.read_csv(DATA_DIR / "release_identifiers_20260628.csv")
 identifiers = identifiers[identifiers["release_candid"] != "release_candid"]
 identifiers["release_candid"] = pd.to_numeric(identifiers["release_candid"])
 identifiers = identifiers.dropna(subset=["release_candid"])
