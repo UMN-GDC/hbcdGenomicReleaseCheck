@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# step 28: filter all derivative outputs to only include release subjects
+# step 28: filter all derivative outputs (GRM/PC-AiR/PC-Relate) to release subjects
 # Reads keep_list.txt (release IIDs) and writes filtered copies to the
 # release data directory, preserving the full-data originals in DATA_DIR.
 #
@@ -11,7 +11,7 @@
 #   - PC-Relate        →  release_dir/hbcd_rsid_harmonized_pcrelate_pairs.{csv,tsv}
 #   - etc.
 #
-# Usage: python 28-filter_release_outputs.py [--release-dir /path/to/release/data]
+# Usage: python 28-filter_release_outputs.py [--release-dir /path]
 # Default release from HBCD_RELEASE env var or br_21p2.
 
 import sys
@@ -78,14 +78,26 @@ def filter_matrix(in_rel, in_id, out_rel, out_id):
     print(f"  {in_rel.name}: {orig_n}x{orig_n} → {len(ids_filtered)}x{len(ids_filtered)}")
 
 
-def filter_binary_grm(in_prefix, out_prefix):
-    """Filter GCTA binary GRM (.grm.id, .grm.bin, .grm.N.bin) to release subjects."""
-    id_in = Path(f"{in_prefix}.grm.id")
-    bin_in = Path(f"{in_prefix}.grm.bin")
-    n_in = Path(f"{in_prefix}.grm.N.bin")
-    id_out = Path(f"{out_prefix}.grm.id")
-    bin_out = Path(f"{out_prefix}.grm.bin")
-    n_out = Path(f"{out_prefix}.grm.N.bin")
+def filter_binary_grm(in_prefix, out_prefix, id_ext=".grm.id", bin_ext=".grm.bin", n_ext=".grm.N.bin"):
+    """Filter a binary GRM to release subjects.
+
+    Parameters
+    ----------
+    in_prefix, out_prefix : str or Path
+        Prefix before the extension parts.
+    id_ext : str
+        Extension for the ID file (default ``.grm.id``).
+    bin_ext : str
+        Extension for the binary GRM file (default ``.grm.bin``).
+    n_ext : str
+        Extension for the N-obs file (default ``.grm.N.bin``).
+    """
+    id_in = Path(f"{in_prefix}{id_ext}")
+    bin_in = Path(f"{in_prefix}{bin_ext}")
+    n_in = Path(f"{in_prefix}{n_ext}")
+    id_out = Path(f"{out_prefix}{id_ext}")
+    bin_out = Path(f"{out_prefix}{bin_ext}")
+    n_out = Path(f"{out_prefix}{n_ext}")
 
     if not id_in.exists() or not bin_in.exists():
         print(f"  SKIP (not found): {in_prefix}.grm.*")
@@ -148,6 +160,30 @@ def filter_kinmat_wide(in_path, out_path):
     out_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_path, index=False)
     print(f"  {in_path.name}: {len(df)} samples x {len(cols)-1} cols")
+
+
+def filter_grm_text_gz(in_path, out_path):
+    """Filter a gzipped text GRM (GCTA ``--make-grm-gz`` format).
+
+    Columns assumed: ``FID1 IID1 FID2 IID2 N GRM``, space-separated, no
+    header.  Only rows where both **IID1** and **IID2** are in
+    ``release_iids`` are kept.
+    """
+    if not in_path.exists():
+        print(f"  SKIP (not found): {in_path}")
+        return
+    # Read gzipped text with no header — ID columns are str, N/GRM are float
+    df = pd.read_csv(
+        in_path, sep=r"\s+", header=None,
+        names=["FID1", "IID1", "FID2", "IID2", "N", "GRM"],
+        dtype={"FID1": str, "IID1": str, "FID2": str, "IID2": str},
+    )
+    before = len(df)
+    mask = df["IID1"].isin(release_iids) & df["IID2"].isin(release_iids)
+    df = df[mask]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out_path, sep=" ", header=False, index=False, compression="gzip")
+    print(f"  {in_path.name}: {before} → {len(df)} rows")
 
 
 # ===========================================================================
@@ -258,5 +294,54 @@ for ext in ["csv", "tsv"]:
         DATA_DIR / f"{NAME}_pcrelate_kinmat_wide.{ext}",
         RELEASE_DIR / f"{NAME}_pcrelate_kinmat_wide.{ext}",
     )
+
+# ===========================================================================
+# PC-Relate GRM (binary — pcrelate_grm naming, no extra .grm. infix)
+# ===========================================================================
+print("\n--- PC-Relate GRM (binary) ---")
+filter_binary_grm(
+    str(DATA_DIR / "hbcd_pcrelate_grm"),
+    str(RELEASE_DIR / "hbcd_pcrelate_grm"),
+    id_ext=".id", bin_ext=".bin", n_ext=".N.bin",
+)
+
+# ===========================================================================
+# PC-Relate GRM (gzipped text)
+# ===========================================================================
+print("\n--- PC-Relate GRM (text gz) ---")
+filter_grm_text_gz(
+    DATA_DIR / "hbcd_pcrelate_grm.gz",
+    RELEASE_DIR / "hbcd_pcrelate_grm.gz",
+)
+
+# ===========================================================================
+# PC-Relate GRM pairwise
+# ===========================================================================
+print("\n--- PC-Relate GRM pairwise ---")
+filter_csv(
+    DATA_DIR / "hbcd_pcrelate_grm_pairwise.tsv",
+    RELEASE_DIR / "hbcd_pcrelate_grm_pairwise.tsv",
+    ["ID1", "ID2"],
+)
+
+# ===========================================================================
+# PC-Relate relatedness
+# ===========================================================================
+print("\n--- PC-Relate relatedness ---")
+filter_csv(
+    DATA_DIR / "hbcd_pcrelate_relatedness.tsv",
+    RELEASE_DIR / "hbcd_pcrelate_relatedness.tsv",
+    ["subject_id_1", "subject_id_2"],
+)
+
+# ===========================================================================
+# PC-AiR 32 PCs clean
+# ===========================================================================
+print("\n--- PC-AiR 32 PCs clean ---")
+filter_text(
+    DATA_DIR / "hbcd_pcair_32PCs_clean.tsv",
+    "participant_id",
+    RELEASE_DIR / "hbcd_pcair_32PCs_clean.tsv",
+)
 
 print("\nDone.")

@@ -7,7 +7,7 @@
 #SBATCH --output=logs/filter_vcf_%A_%a.out
 #SBATCH --error=logs/filter_vcf_%A_%a.err
 
-# step 29: filter imputed VCFs to only include release subjects
+# step 27: filter imputed VCFs to only include release subjects
 # Uses keep_list.txt from step 25 as the sample whitelist.
 # Run AFTER step 25 (keep_list.txt must exist).
 #

@@ -583,3 +583,100 @@ def test_pcrelate_kinmat_wide_ids_are_release():
     assert len(extra_cols) == 0, (
         f"{len(extra_cols)} column ID(s) not in release set: {sorted(extra_cols)[:10]}"
     )
+
+
+# ── PC-Relate GRM (binary) ────────────────────────────────────────────
+
+
+def test_pcrelate_grm_ids_are_release():
+    """All IIDs in hbcd_pcrelate_grm.id are release IIDs."""
+    p = RELEASE_DIR / "hbcd_pcrelate_grm.id"
+    if not p.exists():
+        pytest.skip("hbcd_pcrelate_grm.id not found")
+    ids = pd.read_csv(p, sep=r"\s+", header=None, names=["FID", "IID"], dtype=str)
+    iids = set(ids["IID"])
+    extra = iids - _release_iids()
+    assert len(extra) == 0, (
+        f"{len(extra)} IID(s) in pcrelate_grm.id not in release set: "
+        f"{sorted(extra)[:10]}"
+    )
+
+
+def test_pcrelate_grm_dimensions():
+    """hbcd_pcrelate_grm.id row count matches hbcd.fam."""
+    n = _release_n_subjects()
+    p = RELEASE_DIR / "hbcd_pcrelate_grm.id"
+    if not p.exists():
+        pytest.skip("hbcd_pcrelate_grm.id not found")
+    ids = pd.read_csv(p, sep=r"\s+", header=None, names=["FID", "IID"])
+    assert len(ids) == n, (
+        f"pcrelate_grm.id: {len(ids)} rows, expected {n}"
+    )
+
+
+# ── PC-AiR 32 PCs clean ───────────────────────────────────────────────
+
+
+def test_pcair_32pcs_clean_ids_are_release():
+    """All participant_id in hbcd_pcair_32PCs_clean.tsv are release IIDs."""
+    p = RELEASE_DIR / "hbcd_pcair_32PCs_clean.tsv"
+    if not p.exists():
+        pytest.skip("hbcd_pcair_32PCs_clean.tsv not found")
+    df = pd.read_csv(p, sep="\t", dtype=str)
+    ids = set(df["participant_id"].dropna().astype(str))
+    extra = ids - _release_iids()
+    assert len(extra) == 0, (
+        f"{len(extra)} participant_id(s) in 32PCs_clean not in release set: "
+        f"{sorted(extra)[:10]}"
+    )
+
+
+# ── PC-Relate GRM pairwise ────────────────────────────────────────────
+
+
+def test_pcrelate_grm_pairwise_ids_are_release():
+    """All ID1/ID2 in hbcd_pcrelate_grm_pairwise.tsv are release IIDs."""
+    p = RELEASE_DIR / "hbcd_pcrelate_grm_pairwise.tsv"
+    if not p.exists():
+        pytest.skip("hbcd_pcrelate_grm_pairwise.tsv not found")
+    df = pd.read_csv(p, sep="\t", dtype=str)
+    all_ids = set(df["ID1"]).union(set(df["ID2"]))
+    extra = all_ids - _release_iids()
+    assert len(extra) == 0, (
+        f"{len(extra)} ID(s) in pcrelate_grm_pairwise not in release set: "
+        f"{sorted(extra)[:10]}"
+    )
+
+
+# ── PC-Relate relatedness ─────────────────────────────────────────────
+
+
+def test_pcrelate_relatedness_ids_are_release():
+    """All subject_id_1/subject_id_2 in hbcd_pcrelate_relatedness.tsv are release IIDs."""
+    p = RELEASE_DIR / "hbcd_pcrelate_relatedness.tsv"
+    if not p.exists():
+        pytest.skip("hbcd_pcrelate_relatedness.tsv not found")
+    df = pd.read_csv(p, sep="\t", dtype=str)
+    all_ids = set(df["subject_id_1"]).union(set(df["subject_id_2"]))
+    extra = all_ids - _release_iids()
+    assert len(extra) == 0, (
+        f"{len(extra)} ID(s) in pcrelate_relatedness not in release set: "
+        f"{sorted(extra)[:10]}"
+    )
+
+
+# ── CNV slim clean ────────────────────────────────────────────────────
+
+
+def test_cnv_slim_clean_ids_are_release():
+    """All sample_id in CNV_slim_clean.txt are release IIDs."""
+    p = RELEASE_DIR / "CNV_slim_clean.txt"
+    if not p.exists():
+        pytest.skip("CNV_slim_clean.txt not found")
+    df = pd.read_csv(p, sep="\t", dtype=str)
+    ids = set(df["sample_id"].dropna().astype(str))
+    extra = ids - _release_iids()
+    assert len(extra) == 0, (
+        f"{len(extra)} sample_id(s) in CNV_slim_clean.txt not in release set: "
+        f"{sorted(extra)[:10]}"
+    )
