@@ -115,7 +115,7 @@ export HBCD_RELEASE=br_21p2
 #   ├── data/            # filtered release files
 #   │   ├── hbcd.bed/bim/fam
 #   │   ├── batch.info
-#   │   ├── hbcd_pcrelate_grm.{grm.id,grm.bin,grm.N.bin,gz}
+#   │   ├── hbcd_pcrelate_grm.{grm.id,grm.bin,grm.N.bin,grm.gz}
 #   │   ├── hbcd_pcair_32PCs_clean.tsv
 #   │   ├── hbcd_pcrelate_grm_pairwise.tsv
 #   │   ├── CNV_slim_clean.txt
@@ -247,7 +247,7 @@ Filtering methods per file type:
 | File type | Filter column(s) | Helper |
 |-----------|---|--------|
 | PC-Relate GRM binary (`hbcd_pcrelate_grm.grm.*`) | IID | `filter_binary_grm()` |
-| PC-Relate GRM text (`hbcd_pcrelate_grm.gz`) | IID1, IID2 | `filter_grm_text_gz()` |
+| PC-Relate GRM text (`hbcd_pcrelate_grm.grm.gz`) | IID1, IID2 | `filter_grm_text_gz()` |
 | PC-AiR 32 PCs (`hbcd_pcair_32PCs_clean.tsv`) | `subject_id` | `filter_text()` |
 | PC-Relate pairwise (`hbcd_pcrelate_grm_pairwise.tsv`) | `ID1`, `ID2` | `filter_csv()` |
 | CNV (`CNV_slim_clean.txt`) | `sample_id` | inline filter |

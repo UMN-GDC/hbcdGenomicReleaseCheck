@@ -233,12 +233,48 @@ _check_file(
 
 # ── PC-Relate GRM gzipped text ──────────────────────────────────────────
 
-_check_file(
-    RELEASE_DIR / "hbcd_pcrelate_grm.grm.gz",
-    "hbcd_pcrelate_grm.grm.gz",
-    ["1", "3"],  # IID1, IID2 — headerless, 0-indexed
-    reader="fwf",
-)
+# Uses 1-based indices into .grm.id; map through the ID file
+_grm_gz_path = RELEASE_DIR / "hbcd_pcrelate_grm.grm.gz"
+_grm_id_path = RELEASE_DIR / "hbcd_pcrelate_grm.grm.id"
+if _grm_gz_path.exists():
+    if not _grm_id_path.exists():
+        print("  [  SKIP]  hbcd_pcrelate_grm.grm.gz — .grm.id not found")
+    else:
+        grm_ids = pd.read_csv(
+            _grm_id_path, sep=r"\s+", header=None,
+            names=["FID", "IID"], dtype=str,
+        )
+        iid_list = grm_ids["IID"].tolist()
+        df_gz = pd.read_csv(
+            _grm_gz_path, sep=r"\s+", header=None,
+            names=["IID1", "IID2", "N", "GRM"],
+            dtype={"IID1": int, "IID2": int, "N": int, "GRM": float},
+        )
+        gz_iids = set()
+        max_idx1 = df_gz["IID1"].max()
+        max_idx2 = df_gz["IID2"].max()
+        for _, row in df_gz.iterrows():
+            idx1, idx2 = int(row["IID1"]), int(row["IID2"])
+            if 1 <= idx1 <= len(iid_list):
+                gz_iids.add(iid_list[idx1 - 1])
+            if 1 <= idx2 <= len(iid_list):
+                gz_iids.add(iid_list[idx2 - 1])
+        overlap = gz_iids & exc_iids
+        s = _ok(len(overlap))
+        print(f"  [{s:>7}]  hbcd_pcrelate_grm.grm.gz")
+        print(f"           total rows       : {len(df_gz):>6}")
+        print(f"           max idx1/idx2    : {max_idx1} / {max_idx2}")
+        print(f"           grm.id subjects  : {len(iid_list):>6}")
+        print(f"           excluded IIDs    : {len(overlap):>6}")
+        if overlap:
+            print(f"           overlapping      : {sorted(overlap)[:20]}")
+        if release_iids:
+            extra = gz_iids - release_iids - exc_iids
+            if extra:
+                print(f"           WARN: {len(extra)} IID(s) not in release "
+                      f"set nor excluded: {sorted(extra)[:10]}")
+else:
+    print("  [  SKIP]  hbcd_pcrelate_grm.grm.gz — not found")
 
 # ── CNV slim clean ───────────────────────────────────────────────────────
 

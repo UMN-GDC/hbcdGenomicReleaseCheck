@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 
 from _lib import (
     DATA_DIR,
+    get_release_dir,
+    get_release_base,
     load_identifiers,
     load_additional_excluded_pscids,
 )
@@ -206,10 +208,22 @@ How many of the QC-passing subjects end up on an exclusion list?
 
 ```{python}
 #| label: cardinality-c
-print(f"  onlyQc (QC-pass)          : {len(onlyqc_ids):>6} IID")
-print(f"  Combined exclusion lists  : {len(all_exc_iids):>6} IID")
-print(f"  onlyQc ∩ exclusions       : {len(onlyqc_ids & all_exc_iids):>6} IID")
-print(f"  onlyQc ∖ exclusions       : {len(onlyqc_ids - all_exc_iids):>6} IID  ← candidates for release")
+release_base = get_release_base()
+keep = pd.read_csv(
+    release_base / "keep_list.txt",
+    sep=r"\s+", header=None, names=["FID", "IID"],
+)
+n_actual_release = len(keep)
+
+n_candidates = len(onlyqc_ids - all_exc_iids)
+n_pipeline_drop = n_candidates - n_actual_release
+
+print(f"  onlyQc (QC-pass)               : {len(onlyqc_ids):>6} IID")
+print(f"  Combined exclusion lists       : {len(all_exc_iids):>6} IID")
+print(f"  onlyQc ∩ exclusions            : {len(onlyqc_ids & all_exc_iids):>6} IID")
+print(f"  onlyQc ∖ exclusions (candidate): {n_candidates:>6} IID")
+print(f"  Pipeline filters                : {n_pipeline_drop:>6} IID  (missing visit/plate, duplicate IID)")
+print(f"  Final release                   : {n_actual_release:>6} IID")
 ```
 
 ```{python}
@@ -254,7 +268,9 @@ n_controls = len(control_ids & remapped_ids)
 n_qc = len(qc_fail_ids)
 n_onlyqc = len(onlyqc_ids)
 n_excluded_qc = len(onlyqc_ids & all_exc_iids)
-n_release = len(onlyqc_ids - all_exc_iids)
+n_candidate = n_onlyqc - n_excluded_qc
+n_pdrop = n_candidate - n_actual_release
+n_release = n_actual_release
 
 fig, ax = plt.subplots(figsize=(10, 4.5))
 ax.axis("off")
@@ -284,7 +300,8 @@ box(ax, 3.8, y_top, f"Controls\n({n_controls})", red)
 box(ax, 3.8, y_bot, f"Failed QC\n({n_qc})", red)
 box(ax, 4.5, y_mid, f"Passed QC\n({n_onlyqc})", green)
 box(ax, 7.5, y_top, f"Excluded \n({n_excluded_qc})", orange)
-box(ax, 7.5, y_bot, f"Release\n({n_release})", ltblue)
+box(ax, 6.1, y_bot, f"Pipeline\nfilters\n({n_pdrop})", "#cab2d6")
+box(ax, 8.8, y_bot, f"Final\nrelease\n({n_release})", ltblue)
 
 # arrows from Raw HBCD right edge (x=2.15)
 ax.annotate("", xy=(2.9, 3.7), xytext=(2.15, 2.7),
@@ -300,8 +317,12 @@ ax.annotate("exclusion lists", xy=(5.45, 2.6), xytext=(5.45, 3.0),
             fontsize=8, ha="center", va="bottom", zorder=3)
 ax.annotate("", xy=(6.55, 3.7), xytext=(5.55, 2.5),
             arrowprops=dict(arrowstyle="->", lw=1.5, color="k"), zorder=1)
-ax.annotate("", xy=(6.55, 1.1), xytext=(5.55, 2.3),
+ax.annotate("", xy=(5.2, 1.1), xytext=(5.55, 2.3),
             arrowprops=dict(arrowstyle="->", lw=1.5, color="k"), zorder=1)
+ax.annotate("", xy=(7.0, 1.1), xytext=(6.95, 1.1),
+            arrowprops=dict(arrowstyle="->", lw=1.5, color="k"), zorder=1)
+ax.annotate("metadata /\ndedup", xy=(7.25, 1.3), xytext=(7.25, 1.7),
+            fontsize=7, ha="center", va="bottom", zorder=3)
 
 plt.tight_layout()
 plt.show()
@@ -309,7 +330,7 @@ plt.show()
 diagram = f"""flowchart LR
   A["Raw HBCD ({n_total})"] -->|"QC fail ({n_qc}) + controls ({n_controls}) removed"| B["onlyQc ({n_onlyqc})"]
   B -->|exclusion lists| C["Excluded in QC ({n_excluded_qc})"]
-  B --> D["Release candidate ({n_release})"]
+  B -->|"metadata/dedup ({n_pdrop})"| D["Final release ({n_release})"]
 """
 Path("pipeline.mmd").write_text(diagram)
 ```

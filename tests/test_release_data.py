@@ -454,16 +454,36 @@ def test_pcrelate_grm_pairwise_ids_are_release():
 
 
 def test_pcrelate_grm_gz_ids_are_release():
-    """All IID1/IID2 in hbcd_pcrelate_grm.grm.gz are release IIDs."""
-    p = RELEASE_DIR / "hbcd_pcrelate_grm.grm.gz"
-    if not p.exists():
+    """All IID1/IID2 in hbcd_pcrelate_grm.grm.gz are release IIDs.
+
+    The gz file uses 1-based indices into .grm.id; map through the ID file.
+    """
+    p_gz = RELEASE_DIR / "hbcd_pcrelate_grm.grm.gz"
+    p_id = RELEASE_DIR / "hbcd_pcrelate_grm.grm.id"
+    if not p_gz.exists():
         pytest.skip("hbcd_pcrelate_grm.grm.gz not found")
-    df = pd.read_csv(
-        p, sep=r"\s+", header=None,
-        names=["FID1", "IID1", "FID2", "IID2", "N", "GRM"],
-        dtype=str,
+    if not p_id.exists():
+        pytest.skip("hbcd_pcrelate_grm.grm.id not found")
+
+    grm_ids = pd.read_csv(
+        p_id, sep=r"\s+", header=None,
+        names=["FID", "IID"], dtype=str,
     )
-    all_ids = set(df["IID1"]).union(set(df["IID2"]))
+    iid_list = grm_ids["IID"].tolist()
+
+    df = pd.read_csv(
+        p_gz, sep=r"\s+", header=None,
+        names=["IID1", "IID2", "N", "GRM"],
+        dtype={"IID1": int, "IID2": int},
+    )
+    all_ids = set()
+    for _, row in df.iterrows():
+        idx1, idx2 = int(row["IID1"]), int(row["IID2"])
+        if 1 <= idx1 <= len(iid_list):
+            all_ids.add(iid_list[idx1 - 1])
+        if 1 <= idx2 <= len(iid_list):
+            all_ids.add(iid_list[idx2 - 1])
+
     extra = all_ids - _release_iids()
     assert len(extra) == 0, (
         f"{len(extra)} ID(s) in pcrelate_grm.grm.gz not in release set: "

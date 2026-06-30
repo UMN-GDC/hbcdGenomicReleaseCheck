@@ -6,7 +6,7 @@
 #
 # Filtered outputs:
 #   - PC-Relate GRM (binary)  →  release_dir/hbcd_pcrelate_grm.{grm.id,grm.bin,grm.N.bin}
-#   - PC-Relate GRM (text gz) →  release_dir/hbcd_pcrelate_grm.gz
+#   - PC-Relate GRM (text gz) →  release_dir/hbcd_pcrelate_grm.grm.gz
 #   - PC-Relate GRM pairwise  →  release_dir/hbcd_pcrelate_grm_pairwise.tsv
 #   - PC-AiR 32 PCs clean     →  release_dir/hbcd_pcair_32PCs_clean.tsv
 #   - CNV slim clean          →  release_dir/CNV_slim_clean.txt
@@ -110,17 +110,30 @@ def filter_csv(in_path, out_path, id_cols, sep=","):
     print(f"  {in_path.name}: {before} → {len(df)} rows")
 
 
-def filter_grm_text_gz(in_path, out_path):
+def filter_grm_text_gz(in_path, orig_id_path, out_path):
     if not in_path.exists():
         print(f"  SKIP (not found): {in_path}")
         return
+    if not orig_id_path.exists():
+        print(f"  SKIP (not found): {orig_id_path}")
+        return
+
+    # Read original .grm.id to map 1-based indices → IIDs
+    orig_ids = pd.read_csv(
+        orig_id_path, sep="\t", header=None, names=["FID", "IID"], dtype=str
+    )
+    keep_indices = {i + 1 for i, row in orig_ids.iterrows()
+                    if row["IID"] in release_iids}
+    print(f"  GRM text: {len(orig_ids)} subjects → {len(keep_indices)} kept")
+
+    # Text GRM format: IID1 IID2 N GRM  (1-based indices, not IID strings)
     df = pd.read_csv(
         in_path, sep=r"\s+", header=None,
-        names=["FID1", "IID1", "FID2", "IID2", "N", "GRM"],
-        dtype={"FID1": str, "IID1": str, "FID2": str, "IID2": str},
+        names=["IID1", "IID2", "N", "GRM"],
+        dtype={"IID1": int, "IID2": int, "N": int, "GRM": float},
     )
     before = len(df)
-    mask = df["IID1"].isin(release_iids) & df["IID2"].isin(release_iids)
+    mask = df["IID1"].isin(keep_indices) & df["IID2"].isin(keep_indices)
     df = df[mask]
     out_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_path, sep=" ", header=False, index=False, compression="gzip")
@@ -143,7 +156,8 @@ filter_binary_grm(
 print("\n--- PC-Relate GRM (text gz) ---")
 filter_grm_text_gz(
     HANDOFF_DIR / "hbcd_pcrelate_grm.grm.gz",
-    RELEASE_DIR / "hbcd_pcrelate_grm.gz",
+    HANDOFF_DIR / "hbcd_pcrelate_grm.grm.id",
+    RELEASE_DIR / "hbcd_pcrelate_grm.grm.gz",
 )
 
 # ===========================================================================

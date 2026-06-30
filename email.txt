@@ -1,0 +1,69 @@
+Subject: HBCD Genomics Release Data Handoff — br_21p2
+
+Hi team,
+
+The HBCD genomics release dataset (br_21p2) is ready for delivery. Here's the data flow:
+
+Source data (de-identified, all QC-passing subjects):
+/projects/standard/basu_hbcd/shared/data/
+
+This directory contains the de-identified PLINK dataset onlyQc.{bed,bim,fam}
+with release_candid IDs (format {10-digit_candid}{C|M}), along with the
+identifiers crosswalk (release_identifiers_20260628.csv), batch info, and
+exclusion lists.
+
+Handoff derivatives (GRM, PC-AiR, PC-Relate, CNV) are in:
+/projects/standard/basu_hbcd/shared/data_handoff/ — also de-identified.
+
+Output data (release subject subset):
+/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data/
+
+Contains the filtered release files:
+  hbcd.bed/bim/fam                   — release PLINK files
+  batch.info                         — visit/plate metadata
+  hbcd_pcrelate_grm.*                — PC-Relate GRM (binary + text)
+  hbcd_pcair_32PCs_clean.tsv         — ancestry-adjusted PCs
+  hbcd_pcrelate_grm_pairwise.tsv     — pairwise relatedness
+  CNV_slim_clean.txt                 — CNV calls
+  Removed_individuals.txt            — excluded subjects
+  imputed/                           — per-chromosome dose VCFs
+
+Filtering pipeline (Phase C scripts):
+The following scripts reproduce the output from the source data. Run in order:
+
+  # 1. Build subject whitelist + de-ID mapping
+  source ~/miniconda3/etc/profile.d/conda.sh
+  conda activate python
+  python 25-filterGenotypeFiles.py
+
+  # 2. PLINK2 --keep → release bed/bim/fam
+  ./26-run_plink_filter.sh
+
+  # 3. Filter imputed VCFs (SLURM array, 24 tasks)
+  sbatch 27-filter_imputed_vcf.SLURM
+
+  # 4. De-identify CNV (pscid → release_candid)
+  python 28-cnv-deid.py
+
+  # 5. Filter all derivatives (GRM, PCs, pairwise, CNV) to release IIDs
+  python 29-filter_release_outputs.py
+
+  # 6. Validate no excluded subjects leaked into outputs
+  python 30-validateExclusions.py
+  python -m pytest tests/ -v
+
+The release tag is controlled by HBCD_RELEASE (default br_21p2). To produce a
+different release, set: export HBCD_RELEASE=br_22p0
+
+Key design decisions:
+- De-identification happens first (pscid → release_candid), then filtering —
+  so a 3rd party can safely handle only de-identified data.
+- Original files are never modified; all output goes to the release-specific
+  directory.
+- Only subjects with completed par_visit data, passing QC, and absent from
+  all exclusion lists are included.
+
+If the exclusion list changes, only Phase C needs re-running — the underlying
+derivatives remain valid.
+
+Let me know if you have any questions.
