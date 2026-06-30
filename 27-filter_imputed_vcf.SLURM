@@ -11,7 +11,7 @@
 # Uses keep_list.txt from step 25 as the sample whitelist.
 # Run AFTER step 25 (keep_list.txt must exist).
 #
-# Env: HBCD_RELEASE  — release tag (default: br_21p2)
+# Env: HBCD_RELEASE  — release tag (default: br_21p3)
 #       RELEASE_BASE — override release base dir (default: derived)
 
 set -euo pipefail
@@ -19,7 +19,7 @@ set -euo pipefail
 module load bcftools
 
 DATA_DIR=/projects/standard/basu_hbcd/shared/data
-: "${HBCD_RELEASE:=br_21p2}"
+: "${HBCD_RELEASE:=br_21p3}"
 : "${RELEASE_BASE:=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_${HBCD_RELEASE}}"
 
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)

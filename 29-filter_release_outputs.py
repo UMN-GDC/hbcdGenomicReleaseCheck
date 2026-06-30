@@ -12,7 +12,7 @@
 #   - CNV slim clean          →  release_dir/CNV_slim_clean.txt
 #
 # Usage: python 29-filter_release_outputs.py [--release-dir /path]
-# Default release from HBCD_RELEASE env var or br_21p2.
+# Default release from HBCD_RELEASE env var or br_21p3.
 
 import sys
 import pandas as pd

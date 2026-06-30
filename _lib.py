@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 DATA_DIR = Path("/projects/standard/basu_hbcd/shared/data")
-DEFAULT_RELEASE = "br_21p2"
+DEFAULT_RELEASE = "br_21p3"
 
 # If HBCD_RELEASE env var is set, all scripts use that release
 _RELEASE_ENV = os.environ.get("HBCD_RELEASE", DEFAULT_RELEASE)

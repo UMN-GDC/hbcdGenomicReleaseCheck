@@ -105,13 +105,13 @@ file that was never de-identified (CNV).
 ## Release directory
 
 All output goes to a release-specific directory — originals are never
-modified.  Set the release tag via `HBCD_RELEASE` (default `br_21p2`):
+modified.  Set the release tag via `HBCD_RELEASE` (default `br_21p3`):
 
 ```
-export HBCD_RELEASE=br_21p2
+export HBCD_RELEASE=br_21p3
 
 # Output root:
-#   /projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/
+#   /projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p3/
 #   ├── data/            # filtered release files
 #   │   ├── hbcd.bed/bim/fam
 #   │   ├── batch.info
@@ -128,6 +128,8 @@ export HBCD_RELEASE=br_21p2
 To use a different release:
 ```bash
 export HBCD_RELEASE=br_22p0
+# Step 26 also respects HBCD_RELEASE:
+./26-run_plink_filter.sh
 ```
 
 ---
@@ -187,11 +189,9 @@ plink2 --bfile onlyQc \
 - `--keep` restricts output to the release whitelist.
 - Post-processing ensures `batch.info` matches `hbcd.fam` 1:1.
 
-> **Note:** step 26 reads `RELEASE_DIR` (not `HBCD_RELEASE`).  If using a
-> non-default release:
+> **Note:** step 26 now reads `HBCD_RELEASE` directly.  Defaults:
 > ```bash
-> export HBCD_RELEASE=br_22p0
-> export RELEASE_DIR=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_${HBCD_RELEASE}/data
+> export HBCD_RELEASE=br_21p3
 > ./26-run_plink_filter.sh
 > ```
 
