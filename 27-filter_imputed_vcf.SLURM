@@ -27,7 +27,7 @@ chr="${CHROMS[$SLURM_ARRAY_TASK_ID]}"
 
 KEEP_LIST="${RELEASE_BASE}/keep_list.txt"
 IMPUTED_DIRS=("${DATA_DIR}/imputed/c1" "${DATA_DIR}/imputed/c2" "${DATA_DIR}/imputed/c3" "${DATA_DIR}/imputed/cX")
-OUTDIR="${RELEASE_BASE}/data/imputed"
+OUTDIR="${RELEASE_BASE}/genotype_microarray/imputed"
 
 mkdir -p "$OUTDIR" logs
 
@@ -41,7 +41,7 @@ fi
 
 echo "--- Filtering chr${chr} ---"
 echo "  Input : $VCF_FILE"
-echo "  Output: ${OUTDIR}/chr${chr}.dose.vcf.gz"
+echo "  Output: ${OUTDIR}/chr${chr}_dose.vcf.gz"
 
 # Extract IID column from keep_list (column 2) and use as sample whitelist
 # bcftools view --samples-file expects one sample ID per line
@@ -51,14 +51,14 @@ bcftools view \
     "$VCF_FILE" \
     --samples-file "${OUTDIR}/keep_samples_${chr}.txt" \
     --force-samples \
-    -Oz -o "${OUTDIR}/chr${chr}.dose.vcf.gz"
+    -Oz -o "${OUTDIR}/chr${chr}_dose.vcf.gz"
 
-tabix -f -p vcf "${OUTDIR}/chr${chr}.dose.vcf.gz"
+tabix -f -p vcf "${OUTDIR}/chr${chr}_dose.vcf.gz"
 
 rm -f "${OUTDIR}/keep_samples_${chr}.txt"
 
 n_before=$(bcftools query -l "$VCF_FILE" | wc -l)
-n_after=$(bcftools query -l "${OUTDIR}/chr${chr}.dose.vcf.gz" | wc -l)
+n_after=$(bcftools query -l "${OUTDIR}/chr${chr}_dose.vcf.gz" | wc -l)
 echo "  Samples: ${n_before} → ${n_after}"
 
 # Also copy the .info.gz if it exists (no sample filtering needed, but keep paired)

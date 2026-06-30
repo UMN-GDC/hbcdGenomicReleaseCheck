@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # step 30: validate no excluded subjects appear in any release output file
-# Checks hbcd.fam + all derivative files + CNV for excluded-IID contamination.
+# Checks GDA/merged_chroms.fam + all derivative files + CNV for excluded-IID contamination.
 #
 # Usage: python 30-validateExclusions.py [--release-dir /path]
 
@@ -19,6 +19,9 @@ else:
     RELEASE_DIR = get_release_dir()
 
 release_base = RELEASE_DIR.parent
+gda_dir = RELEASE_DIR / "GDA"
+genesis_dir = RELEASE_DIR / "genesis"
+cnv_dir = RELEASE_DIR / "cnv"
 
 
 def _sep(title=""):
@@ -80,12 +83,12 @@ except FileNotFoundError:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 2. hbcd.fam — FID check (release_candid level)
+# 2. GDA/merged_chroms.fam — FID check (release_candid level)
 # ══════════════════════════════════════════════════════════════════════════
 
-_sep("hbcd.fam (release_candid-level check)")
+_sep("GDA/merged_chroms.fam (release_candid-level check)")
 
-fam_path = RELEASE_DIR / "hbcd.fam"
+fam_path = gda_dir / "merged_chroms.fam"
 if fam_path.exists():
     hbcd = pd.read_csv(
         fam_path,
@@ -136,11 +139,11 @@ if fam_path.exists():
         s = _ok(len(in_fam))
         print(f"  [{s:>7}]  {col}")
         print(f"           list size    : {len(pscids):>6}")
-        print(f"           in hbcd.fam  : {len(in_fam):>6}")
+        print(f"           in merged_chroms.fam: {len(in_fam):>6}")
         if in_fam:
             print(f"           overlapping RC: {sorted(in_fam)[:15]}")
 else:
-    print("  SKIP — hbcd.fam not found, skipping per-column check")
+    print("  SKIP — merged_chroms.fam not found, skipping per-column check")
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -204,41 +207,41 @@ def _check_file(path, label, id_cols, reader="csv"):
                   f"nor excluded: {sorted(extra)[:10]}")
 
 
-# ── PC-Relate GRM binary ──────────────────────────────────────────────────
+# ── PC-Relate GRM binary (genesis/) ────────────────────────────────────────
 
 _check_file(
-    RELEASE_DIR / "hbcd_pcrelate_grm.grm.id",
-    "hbcd_pcrelate_grm.grm.id",
+    genesis_dir / "pcrelate_relatedness.grm.id",
+    "genesis/pcrelate_relatedness.grm.id",
     ["1"],  # IID only (col 1) — FID is release_candid, not an IID
     reader="fwf",
 )
 
-# ── PC-AiR 32 PCs clean ──────────────────────────────────────────────────
+# ── PC-AiR 32 PCs clean (genesis/) ────────────────────────────────────────
 
 _check_file(
-    RELEASE_DIR / "hbcd_pcair_32PCs_clean.tsv",
-    "hbcd_pcair_32PCs_clean.tsv",
+    genesis_dir / "pcair_weights.tsv",
+    "genesis/pcair_weights.tsv",
     ["subject_id"],
     reader="tsv",
 )
 
-# ── PC-Relate GRM pairwise ───────────────────────────────────────────────
+# ── PC-Relate GRM pairwise (genesis/) ─────────────────────────────────────
 
 _check_file(
-    RELEASE_DIR / "hbcd_pcrelate_grm_pairwise.tsv",
-    "hbcd_pcrelate_grm_pairwise.tsv",
+    genesis_dir / "pcrelate_relatedness.tsv",
+    "genesis/pcrelate_relatedness.tsv",
     ["ID1", "ID2"],
     reader="tsv",
 )
 
-# ── PC-Relate GRM gzipped text ──────────────────────────────────────────
+# ── PC-Relate GRM gzipped text (genesis/) ────────────────────────────────
 
 # Uses 1-based indices into .grm.id; map through the ID file
-_grm_gz_path = RELEASE_DIR / "hbcd_pcrelate_grm.grm.gz"
-_grm_id_path = RELEASE_DIR / "hbcd_pcrelate_grm.grm.id"
+_grm_gz_path = genesis_dir / "pcrelate_relatedness.grm.gz"
+_grm_id_path = genesis_dir / "pcrelate_relatedness.grm.id"
 if _grm_gz_path.exists():
     if not _grm_id_path.exists():
-        print("  [  SKIP]  hbcd_pcrelate_grm.grm.gz — .grm.id not found")
+        print("  [  SKIP]  genesis/pcrelate_relatedness.grm.gz — .grm.id not found")
     else:
         grm_ids = pd.read_csv(
             _grm_id_path, sep=r"\s+", header=None,
@@ -261,7 +264,7 @@ if _grm_gz_path.exists():
                 gz_iids.add(iid_list[idx2 - 1])
         overlap = gz_iids & exc_iids
         s = _ok(len(overlap))
-        print(f"  [{s:>7}]  hbcd_pcrelate_grm.grm.gz")
+        print(f"  [{s:>7}]  genesis/pcrelate_relatedness.grm.gz")
         print(f"           total rows       : {len(df_gz):>6}")
         print(f"           max idx1/idx2    : {max_idx1} / {max_idx2}")
         print(f"           grm.id subjects  : {len(iid_list):>6}")
@@ -274,13 +277,13 @@ if _grm_gz_path.exists():
                 print(f"           WARN: {len(extra)} IID(s) not in release "
                       f"set nor excluded: {sorted(extra)[:10]}")
 else:
-    print("  [  SKIP]  hbcd_pcrelate_grm.grm.gz — not found")
+    print("  [  SKIP]  genesis/pcrelate_relatedness.grm.gz — not found")
 
-# ── CNV slim clean ───────────────────────────────────────────────────────
+# ── CNV slim clean (cnv/) ────────────────────────────────────────────────
 
 _check_file(
-    RELEASE_DIR / "CNV_slim_clean.txt",
-    "CNV_slim_clean.txt",
+    cnv_dir / "CNV_slim_clean.txt",
+    "cnv/CNV_slim_clean.txt",
     ["sample_id"],
     reader="tsv",
 )

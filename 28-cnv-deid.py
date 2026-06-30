@@ -8,12 +8,15 @@
 # Usage: python 28-cnv-deid.py
 
 import sys
+from pathlib import Path
 import pandas as pd
-from _lib import DATA_DIR, get_release_base, load_identifiers
+from _lib import DATA_DIR, get_release_base, get_release_dir, load_identifiers
 
 CNV_SOURCE_DIR = DATA_DIR.parent / "data_handoff"
 CNV_INPUT = CNV_SOURCE_DIR / "CNV_slim_clean.txt"
-CNV_DEID_OUT = get_release_base() / "CNV_slim_clean_deid.txt"
+CNV_DEID_DIR = get_release_dir() / "cnv"
+CNV_DEID_DIR.mkdir(parents=True, exist_ok=True)
+CNV_DEID_OUT = CNV_DEID_DIR / "CNV_slim_clean_deid.txt"
 
 # ── load identifiers crosswalk ─────────────────────────────────────────
 identifiers = load_identifiers()

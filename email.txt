@@ -1,8 +1,8 @@
-Subject: HBCD Genomics Release Data Handoff — br_21p2
+Subject: HBCD Genomics Release Data Handoff — br_21p3
 
 Hi team,
 
-The HBCD genomics release dataset (br_21p2) is ready for delivery. Here's the data flow:
+The HBCD genomics release dataset (br_21p3) is ready for delivery. Here's the data flow:
 
 Source data (de-identified, all QC-passing subjects):
 /projects/standard/basu_hbcd/shared/data/
@@ -16,27 +16,29 @@ Handoff derivatives (GRM, PC-AiR, PC-Relate, CNV) are in:
 /projects/standard/basu_hbcd/shared/data_handoff/ — also de-identified.
 
 Output data (release subject subset):
-/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p2/data/
+/projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p3/genotype_microarray/
 
 Contains the filtered release files:
-  hbcd.bed/bim/fam                   — release PLINK files
-  batch.info                         — visit/plate metadata
-  hbcd_pcrelate_grm.*                — PC-Relate GRM (binary + text)
-  hbcd_pcair_32PCs_clean.tsv         — ancestry-adjusted PCs
-  hbcd_pcrelate_grm_pairwise.tsv     — pairwise relatedness
-  CNV_slim_clean.txt                 — CNV calls
-  Removed_individuals.txt            — excluded subjects
-  imputed/                           — per-chromosome dose VCFs
+  GDA/merged_chroms.{bed,bim,fam}        — release PLINK files
+  GDA/batch.info                         — visit/plate metadata
+  GDA/removed_individuals.txt            — excluded subjects
+  genesis/pcair_weights.tsv              — ancestry-adjusted PCs
+  genesis/pcrelate_relatedness.grm.*     — PC-Relate GRM (binary + text)
+  genesis/pcrelate_relatedness.tsv       — pairwise relatedness
+  cnv/CNV_slim_clean.txt                 — CNV calls
+  imputed/                               — per-chromosome dose VCFs
 
 Filtering pipeline (Phase C scripts):
 The following scripts reproduce the output from the source data. Run in order:
 
-  # 1. Build subject whitelist + de-ID mapping
+  export HBCD_RELEASE=br_21p3
   source ~/miniconda3/etc/profile.d/conda.sh
   conda activate python
+
+  # 1. Build subject whitelist + de-ID mapping
   python 25-filterGenotypeFiles.py
 
-  # 2. PLINK2 --keep → release bed/bim/fam
+  # 2. PLINK2 --keep → GDA/merged_chroms
   ./26-run_plink_filter.sh
 
   # 3. Filter imputed VCFs (SLURM array, 24 tasks)
@@ -52,7 +54,7 @@ The following scripts reproduce the output from the source data. Run in order:
   python 30-validateExclusions.py
   python -m pytest tests/ -v
 
-The release tag is controlled by HBCD_RELEASE (default br_21p2). To produce a
+The release tag is controlled by HBCD_RELEASE (default br_21p3). To produce a
 different release, set: export HBCD_RELEASE=br_22p0
 
 Key design decisions:

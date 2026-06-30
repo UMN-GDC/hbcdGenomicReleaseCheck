@@ -95,11 +95,11 @@ file that was never de-identified (CNV).
 
 | # | Script | De-ID or Filter | Input | Output |
 |   |--------|----------------|-------|--------|
-| 25 | `filterGenotypeFiles.py` | **De-ID + Filter** | de-IDed `onlyQc.{bed,bim,fam}`, identifiers, exclusions | `keep_list.txt`, `temp.fam`, `batch.info`, `Removed_individuals.txt` |
-| 26 | `run_plink_filter.sh` | Filter | `onlyQc`, `temp.fam`, `keep_list.txt` | `hbcd.{bed,bim,fam}` |
-| 27 | `filter_imputed_vcf.SLURM` | Filter | imputed VCFs (c1/c2/c3/cX), `keep_list.txt` | filtered `imputed/chr*.dose.vcf.gz` |
-| 28 | `cnv-deid.py` | **De-ID** | `data_handoff/CNV_slim_clean.txt`, identifiers | de-IDed `release_base/CNV_slim_clean_deid.txt` |
-| 29 | `filter_release_outputs.py` | Filter | de-IDed handoff files, `keep_list.txt` | filtered GRM/PC-AiR/CNV files in release dir |
+| 25 | `filterGenotypeFiles.py` | **De-ID + Filter** | de-IDed `onlyQc.{bed,bim,fam}`, identifiers, exclusions | `keep_list.txt`, `temp.fam`, `GDA/batch.info`, `GDA/removed_individuals.txt` |
+| 26 | `run_plink_filter.sh` | Filter | `onlyQc`, `temp.fam`, `keep_list.txt` | `GDA/merged_chroms.{bed,bim,fam}` |
+| 27 | `filter_imputed_vcf.SLURM` | Filter | imputed VCFs (c1/c2/c3/cX), `keep_list.txt` | filtered `imputed/chr*_dose.vcf.gz` |
+| 28 | `cnv-deid.py` | **De-ID** | `data_handoff/CNV_slim_clean.txt`, identifiers | de-IDed `cnv/CNV_slim_clean_deid.txt` |
+| 29 | `filter_release_outputs.py` | Filter | de-IDed handoff files, `keep_list.txt` | filtered genesis/ + cnv/ files |
 | 30 | `validateExclusions.py` | — | all release output files | console validation report |
 
 ## Release directory
@@ -112,15 +112,22 @@ export HBCD_RELEASE=br_21p3
 
 # Output root:
 #   /projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p3/
-#   ├── data/            # filtered release files
-#   │   ├── hbcd.bed/bim/fam
-#   │   ├── batch.info
-#   │   ├── hbcd_pcrelate_grm.{grm.id,grm.bin,grm.N.bin,grm.gz}
-#   │   ├── hbcd_pcair_32PCs_clean.tsv
-#   │   ├── hbcd_pcrelate_grm_pairwise.tsv
-#   │   ├── CNV_slim_clean.txt
-#   │   ├── Removed_individuals.txt
-#   │   └── imputed/     # per-chromosome dose VCFs
+#   ├── genotype_microarray/
+#   │   ├── GDA/
+#   │   │   ├── merged_chroms.{bed,bim,fam}
+#   │   │   ├── batch.info
+#   │   │   └── removed_individuals.txt
+#   │   ├── genesis/
+#   │   │   ├── pcair_weights.tsv
+#   │   │   ├── pcrelate_relatedness.grm.id
+#   │   │   ├── pcrelate_relatedness.grm.bin
+#   │   │   ├── pcrelate_relatedness.grm.N.bin
+#   │   │   ├── pcrelate_relatedness.grm.gz
+#   │   │   └── pcrelate_relatedness.tsv
+#   │   ├── imputed/
+#   │   │   └── chr*_dose.vcf.gz + .tbi
+#   │   └── cnv/
+#   │       └── CNV_slim_clean.txt
 #   ├── keep_list.txt
 #   └── temp.fam
 ```
@@ -170,8 +177,8 @@ For the remaining (valid) subjects:
      count exactly to avoid PLINK size mismatch).
    - `keep_list.txt` — subjects that pass *all* filters and have non-missing
      batch metadata.  This is the final release whitelist.
-   - `batch.info` — tab-delimited with columns IID, visit, plate_number.
-   - `Removed_individuals.txt` — excluded IIDs for documentation.
+   - `GDA/batch.info` — tab-delimited with columns IID, visit, plate_number.
+   - `GDA/removed_individuals.txt` — excluded IIDs for documentation.
 
 ### Step 26: `run_plink_filter.sh` — PLINK2 `--keep`
 
@@ -180,16 +187,16 @@ plink2 --bfile onlyQc \
        --allow-extra-chr \
        --fam temp.fam \
        --keep keep_list.txt \
-       --make-bed --out hbcd
+       --make-bed --out GDA/merged_chroms
 ```
 
 - `--bfile` points to the de-identified `onlyQc` data.  `--fam temp.fam`
   supplies the original row count + remapped IDs so the .bed file is read
   correctly and output gets de-identified FID/IID.
 - `--keep` restricts output to the release whitelist.
-- Post-processing ensures `batch.info` matches `hbcd.fam` 1:1.
+- Post-processing ensures `GDA/batch.info` matches `GDA/merged_chroms.fam` 1:1.
 
-> **Note:** step 26 now reads `HBCD_RELEASE` directly.  Defaults:
+> **Note:** step 26 reads `HBCD_RELEASE` directly.  Defaults:
 > ```bash
 > export HBCD_RELEASE=br_21p3
 > ./26-run_plink_filter.sh
@@ -242,15 +249,15 @@ derivative from `data_handoff/`, keeps only rows whose sample IDs appear in
 the release IID whitelist (`keep_list.txt`), and writes filtered copies to
 the release directory.  **Originals are never modified.**
 
-Filtering methods per file type:
+Filtering methods per file type (outputs → `genesis/` or `cnv/`):
 
-| File type | Filter column(s) | Helper |
-|-----------|---|--------|
-| PC-Relate GRM binary (`hbcd_pcrelate_grm.grm.*`) | IID | `filter_binary_grm()` |
-| PC-Relate GRM text (`hbcd_pcrelate_grm.grm.gz`) | IID1, IID2 | `filter_grm_text_gz()` |
-| PC-AiR 32 PCs (`hbcd_pcair_32PCs_clean.tsv`) | `subject_id` | `filter_text()` |
-| PC-Relate pairwise (`hbcd_pcrelate_grm_pairwise.tsv`) | `ID1`, `ID2` | `filter_csv()` |
-| CNV (`CNV_slim_clean.txt`) | `sample_id` | inline filter |
+| Output file | Filter column(s) | Helper |
+|------------|------------------|--------|
+| `genesis/pcrelate_relatedness.grm.*` | IID | `filter_binary_grm()` |
+| `genesis/pcrelate_relatedness.grm.gz` | IID1, IID2 | `filter_grm_text_gz()` |
+| `genesis/pcair_weights.tsv` | `subject_id` | `filter_text()` |
+| `genesis/pcrelate_relatedness.tsv` | `ID1`, `ID2` | `filter_csv()` |
+| `cnv/CNV_slim_clean.txt` | `sample_id` | inline filter |
 
 ```bash
 conda run -n python python 29-filter_release_outputs.py
@@ -280,11 +287,11 @@ quarto render 17-cnv-qc-report.qmd
 The final quality gate (`30-validateExclusions.py`).  Reads every output file
 and checks for contamination by excluded subjects:
 
-- **hbcd.fam** — both FID (release_candid) and IID level
+- **GDA/merged_chroms.fam** — both FID (release_candid) and IID level
 - **HBCDexclusions.csv** — per-column, mapped to release_candid
 - **All derivative files** — IID columns checked against the excluded-IID set
   (`{exc_rc}C` / `{exc_rc}M`)
-- **CNV_slim_clean.txt** — `sample_id` column
+- **cnv/CNV_slim_clean.txt** — `sample_id` column
 - **Cross-check** — warns if any IID is found that's neither in the release set
   nor the exclusion set (catches unexpected subjects)
 
@@ -307,9 +314,8 @@ conda activate python
 # 1. Build keep list + temp.fam (de-ID + filter logic)
 python 25-filterGenotypeFiles.py
 
-# 2. PLINK2 --keep → release bed/bim/fam
-RELEASE_DIR=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_${HBCD_RELEASE}/data \
-  ./26-run_plink_filter.sh
+# 2. PLINK2 --keep → GDA/merged_chroms
+./26-run_plink_filter.sh
 
 # 3. Filter imputed VCFs (SLURM array, 24 tasks — chromosomes 1–22 + X)
 sbatch 27-filter_imputed_vcf.SLURM
@@ -344,8 +350,7 @@ so only Phase C scripts need to be re-executed:
 python 25-filterGenotypeFiles.py
 
 # 2. Re-filter PLINK genotypes
-RELEASE_DIR=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_${HBCD_RELEASE}/data \
-  ./26-run_plink_filter.sh
+./26-run_plink_filter.sh
 
 # 3–5. Re-filter everything (independent of each other)
 sbatch 27-filter_imputed_vcf.SLURM          # VCFs
@@ -387,20 +392,20 @@ IID checks for release derivative outputs:
 | `test_all_output_iids_in_par_visit` | All IIDs pass par_visit + exclusion filter |
 | `test_filter_correctness` | Re-derives expected subject set, confirms match |
 | `test_variant_count_preserved` | .bim variant count unchanged |
-| `test_pcrelate_grm_ids_are_release` | All IIDs in pcrelate_grm.grm.id are in release set |
-| `test_pcrelate_grm_dimensions` | pcrelate_grm.grm.id rows = hbcd.fam rows |
-| `test_pcair_32pcs_clean_ids_are_release` | All subject_ids in 32PCs_clean are in release set |
-| `test_pcrelate_grm_pairwise_ids_are_release` | All ID1/ID2 in pairwise are in release set |
-| `test_cnv_slim_clean_ids_are_release` | All sample_ids in CNV are in release set |
+| `test_pcrelate_grm_ids_are_release` | All IIDs in genesis/pcrelate_relatedness.grm.id are release |
+| `test_pcrelate_grm_dimensions` | genesis/pcrelate_relatedness.grm.id rows = merged_chroms.fam rows |
+| `test_pcair_32pcs_clean_ids_are_release` | All subject_ids in genesis/pcair_weights.tsv are release |
+| `test_pcrelate_grm_pairwise_ids_are_release` | All ID1/ID2 in genesis/pcrelate_relatedness.tsv are release |
+| `test_cnv_slim_clean_ids_are_release` | All sample_ids in cnv/CNV_slim_clean.txt are release |
 
 ### `tests/test_exclusions.py` — 4 tests
 
 | Test | What it checks |
 |------|----------------|
-| `test_hbcdcsv_excluded_pscids_absent` | No HBCDexclusions.csv pscid leaks into hbcd.fam |
+| `test_hbcdcsv_excluded_pscids_absent` | No HBCDexclusions.csv pscid leaks into merged_chroms.fam |
 | `test_each_hbcdcsv_exclusion_reason_individually` | Each exclusion reason checked separately |
 | `test_excel_excluded_release_candids_absent` | No Excel-excluded RC leaks |
-| `test_removed_individuals_absent` | No Removed_individuals.txt IID leaks |
+| `test_removed_individuals_absent` | No GDA/removed_individuals.txt IID leaks |
 
 ```bash
 conda run -n python python -m pytest tests/ -v

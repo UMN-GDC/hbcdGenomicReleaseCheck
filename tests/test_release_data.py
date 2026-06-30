@@ -16,6 +16,9 @@ from _lib import (
 )
 
 RELEASE_DIR = get_release_dir()
+GDA_DIR = RELEASE_DIR / "GDA"
+GENESIS_DIR = RELEASE_DIR / "genesis"
+CNV_DIR = RELEASE_DIR / "cnv"
 NAME = "hbcd_rsid_harmonized"
 
 # ── helpers ──────────────────────────────────────────────────────────────
@@ -23,15 +26,15 @@ NAME = "hbcd_rsid_harmonized"
 
 def _load_data():
     fam = pd.read_csv(
-        RELEASE_DIR / "hbcd.fam",
+        GDA_DIR / "merged_chroms.fam",
         sep=r"\s+",
         header=None,
         names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
     )
-    batch = pd.read_csv(RELEASE_DIR / "batch.info", sep="\t")
+    batch = pd.read_csv(GDA_DIR / "batch.info", sep="\t")
     batch = batch.rename(columns={batch.columns[0]: "IID"})
     excluded = pd.read_csv(
-        RELEASE_DIR / "Removed_individuals.txt",
+        GDA_DIR / "removed_individuals.txt",
         delim_whitespace=True,
         header=None,
         names=["IID"],
@@ -89,9 +92,9 @@ def test_no_fid_zero_in_output():
     Subjects without a release_candid get FID=0 in temp.fam but must be
     filtered out before the release PLINK files are written.
     """
-    p = RELEASE_DIR / "hbcd.fam"
+    p = GDA_DIR / "merged_chroms.fam"
     if not p.exists():
-        pytest.skip("hbcd.fam not found")
+        pytest.skip("merged_chroms.fam not found")
     fam = pd.read_csv(
         p, sep=r"\s+", header=None,
         names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
@@ -108,7 +111,7 @@ def test_all_iids_match_deid_pattern():
     invalid relationship suffix.
     """
     fam, batch, _ = _load_data()
-    for name, iids in [("hbcd.fam", fam["IID"]), ("batch.info", batch["IID"])]:
+    for name, iids in [("GDA/merged_chroms.fam", fam["IID"]), ("GDA/batch.info", batch["IID"])]:
         ok = iids.astype(str).str.match(r"^\d{10}[CM]$")
         assert ok.mean() == 1.0, (
             f"{name}: {(~ok).sum()} IID(s) do not match "
@@ -269,14 +272,14 @@ def test_all_output_iids_in_par_visit():
         )
 
     fids = set(fam["FID"].unique()) - {0}
-    _check_subjects(fids, "hbcd.fam")
+    _check_subjects(fids, "GDA/merged_chroms.fam")
 
     batch_rc = set(
         pd.to_numeric(batch["IID"].str[:-1], errors="coerce")
         .dropna()
         .astype(int)
     )
-    _check_subjects(batch_rc, "batch.info")
+    _check_subjects(batch_rc, "GDA/batch.info")
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -285,7 +288,7 @@ def test_all_output_iids_in_par_visit():
 
 def test_filter_correctness():
     """Re-derive the expected subject set from scratch using the pipeline's
-    own merge-and-filter logic, then verify it matches hbcd.fam exactly."""
+    own merge-and-filter logic, then verify it matches merged_chroms.fam exactly."""
     identifiers = load_identifiers()
     par_candids = load_par_visit_candids()
     exc_rc = load_excluded_release_candids()
@@ -305,7 +308,7 @@ def test_filter_correctness():
     temp = _load_temp_fam()
     temp["_rel"] = temp["IID"].astype(str).str[-1]
 
-    input_batch = pd.read_csv(RELEASE_DIR / "batch.info", sep="\t")
+    input_batch = pd.read_csv(GDA_DIR / "batch.info", sep="\t")
     input_batch["_rel"] = input_batch["IID"].str[-1]
     input_batch["_rc"] = pd.to_numeric(input_batch["IID"].str[:-1])
 
@@ -352,7 +355,7 @@ def test_variant_count_preserved():
         names=["CHR", "SNP", "GD", "BP", "A1", "A2"],
     )
     out = pd.read_csv(
-        RELEASE_DIR / "hbcd.bim",
+        GDA_DIR / "merged_chroms.bim",
         sep=r"\s+", header=None,
         names=["CHR", "SNP", "GD", "BP", "A1", "A2"],
     )
@@ -367,9 +370,9 @@ def test_variant_count_preserved():
 
 
 def _release_n_subjects():
-    """Number of subjects in hbcd.fam (used for matrix-dimension checks)."""
+    """Number of subjects in merged_chroms.fam (used for matrix-dimension checks)."""
     fam = pd.read_csv(
-        RELEASE_DIR / "hbcd.fam",
+        GDA_DIR / "merged_chroms.fam",
         sep=r"\s+", header=None,
         names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
     )
@@ -391,28 +394,28 @@ def _release_iids():
 
 
 def test_pcrelate_grm_ids_are_release():
-    """All IIDs in hbcd_pcrelate_grm.grm.id are release IIDs."""
-    p = RELEASE_DIR / "hbcd_pcrelate_grm.grm.id"
+    """All IIDs in genesis/pcrelate_relatedness.grm.id are release IIDs."""
+    p = GENESIS_DIR / "pcrelate_relatedness.grm.id"
     if not p.exists():
-        pytest.skip("hbcd_pcrelate_grm.grm.id not found")
+        pytest.skip("genesis/pcrelate_relatedness.grm.id not found")
     ids = pd.read_csv(p, sep=r"\s+", header=None, names=["FID", "IID"], dtype=str)
     iids = set(ids["IID"])
     extra = iids - _release_iids()
     assert len(extra) == 0, (
-        f"{len(extra)} IID(s) in pcrelate_grm.id not in release set: "
+        f"{len(extra)} IID(s) in pcrelate_relatedness.grm.id not in release set: "
         f"{sorted(extra)[:10]}"
     )
 
 
 def test_pcrelate_grm_dimensions():
-    """hbcd_pcrelate_grm.grm.id row count matches hbcd.fam."""
+    """genesis/pcrelate_relatedness.grm.id row count matches merged_chroms.fam."""
     n = _release_n_subjects()
-    p = RELEASE_DIR / "hbcd_pcrelate_grm.grm.id"
+    p = GENESIS_DIR / "pcrelate_relatedness.grm.id"
     if not p.exists():
-        pytest.skip("hbcd_pcrelate_grm.grm.id not found")
+        pytest.skip("genesis/pcrelate_relatedness.grm.id not found")
     ids = pd.read_csv(p, sep=r"\s+", header=None, names=["FID", "IID"])
     assert len(ids) == n, (
-        f"pcrelate_grm.id: {len(ids)} rows, expected {n}"
+        f"pcrelate_relatedness.grm.id: {len(ids)} rows, expected {n}"
     )
 
 
@@ -420,15 +423,15 @@ def test_pcrelate_grm_dimensions():
 
 
 def test_pcair_32pcs_clean_ids_are_release():
-    """All participant_id in hbcd_pcair_32PCs_clean.tsv are release IIDs."""
-    p = RELEASE_DIR / "hbcd_pcair_32PCs_clean.tsv"
+    """All participant_id in genesis/pcair_weights.tsv are release IIDs."""
+    p = GENESIS_DIR / "pcair_weights.tsv"
     if not p.exists():
-        pytest.skip("hbcd_pcair_32PCs_clean.tsv not found")
+        pytest.skip("genesis/pcair_weights.tsv not found")
     df = pd.read_csv(p, sep="\t", dtype=str)
     ids = set(df["subject_id"].dropna().astype(str))
     extra = ids - _release_iids()
     assert len(extra) == 0, (
-        f"{len(extra)} participant_id(s) in 32PCs_clean not in release set: "
+        f"{len(extra)} participant_id(s) in pcair_weights.tsv not in release set: "
         f"{sorted(extra)[:10]}"
     )
 
@@ -437,15 +440,15 @@ def test_pcair_32pcs_clean_ids_are_release():
 
 
 def test_pcrelate_grm_pairwise_ids_are_release():
-    """All ID1/ID2 in hbcd_pcrelate_grm_pairwise.tsv are release IIDs."""
-    p = RELEASE_DIR / "hbcd_pcrelate_grm_pairwise.tsv"
+    """All ID1/ID2 in genesis/pcrelate_relatedness.tsv are release IIDs."""
+    p = GENESIS_DIR / "pcrelate_relatedness.tsv"
     if not p.exists():
-        pytest.skip("hbcd_pcrelate_grm_pairwise.tsv not found")
+        pytest.skip("genesis/pcrelate_relatedness.tsv not found")
     df = pd.read_csv(p, sep="\t", dtype=str)
     all_ids = set(df["ID1"]).union(set(df["ID2"]))
     extra = all_ids - _release_iids()
     assert len(extra) == 0, (
-        f"{len(extra)} ID(s) in pcrelate_grm_pairwise not in release set: "
+        f"{len(extra)} ID(s) in pcrelate_relatedness.tsv not in release set: "
         f"{sorted(extra)[:10]}"
     )
 
@@ -454,16 +457,16 @@ def test_pcrelate_grm_pairwise_ids_are_release():
 
 
 def test_pcrelate_grm_gz_ids_are_release():
-    """All IID1/IID2 in hbcd_pcrelate_grm.grm.gz are release IIDs.
+    """All IID1/IID2 in genesis/pcrelate_relatedness.grm.gz are release IIDs.
 
     The gz file uses 1-based indices into .grm.id; map through the ID file.
     """
-    p_gz = RELEASE_DIR / "hbcd_pcrelate_grm.grm.gz"
-    p_id = RELEASE_DIR / "hbcd_pcrelate_grm.grm.id"
+    p_gz = GENESIS_DIR / "pcrelate_relatedness.grm.gz"
+    p_id = GENESIS_DIR / "pcrelate_relatedness.grm.id"
     if not p_gz.exists():
-        pytest.skip("hbcd_pcrelate_grm.grm.gz not found")
+        pytest.skip("genesis/pcrelate_relatedness.grm.gz not found")
     if not p_id.exists():
-        pytest.skip("hbcd_pcrelate_grm.grm.id not found")
+        pytest.skip("genesis/pcrelate_relatedness.grm.id not found")
 
     grm_ids = pd.read_csv(
         p_id, sep=r"\s+", header=None,
@@ -486,7 +489,7 @@ def test_pcrelate_grm_gz_ids_are_release():
 
     extra = all_ids - _release_iids()
     assert len(extra) == 0, (
-        f"{len(extra)} ID(s) in pcrelate_grm.grm.gz not in release set: "
+        f"{len(extra)} ID(s) in pcrelate_relatedness.grm.gz not in release set: "
         f"{sorted(extra)[:10]}"
     )
 
@@ -495,10 +498,10 @@ def test_pcrelate_grm_gz_ids_are_release():
 
 
 def test_cnv_slim_clean_ids_are_release():
-    """All sample_id in CNV_slim_clean.txt are release IIDs."""
-    p = RELEASE_DIR / "CNV_slim_clean.txt"
+    """All sample_id in cnv/CNV_slim_clean.txt are release IIDs."""
+    p = CNV_DIR / "CNV_slim_clean.txt"
     if not p.exists():
-        pytest.skip("CNV_slim_clean.txt not found")
+        pytest.skip("cnv/CNV_slim_clean.txt not found")
     df = pd.read_csv(p, sep="\t", dtype=str)
     ids = set(df["sample_id"].dropna().astype(str))
     extra = ids - _release_iids()

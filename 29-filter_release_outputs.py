@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
 # step 29: filter all de-identified handoff derivatives to release subjects
-# Reads keep_list.txt (release IIDs) + de-IDed CNV from data_handoff/,
-# writes filtered copies to the release data directory.
+# Reads keep_list.txt (release IIDs) + de-IDed CNV, writes filtered copies
+# to genotype_microarray subdirectories (genesis/, cnv/).
 #
 # Filtered outputs:
-#   - PC-Relate GRM (binary)  →  release_dir/hbcd_pcrelate_grm.{grm.id,grm.bin,grm.N.bin}
-#   - PC-Relate GRM (text gz) →  release_dir/hbcd_pcrelate_grm.grm.gz
-#   - PC-Relate GRM pairwise  →  release_dir/hbcd_pcrelate_grm_pairwise.tsv
-#   - PC-AiR 32 PCs clean     →  release_dir/hbcd_pcair_32PCs_clean.tsv
-#   - CNV slim clean          →  release_dir/CNV_slim_clean.txt
+#   - PC-Relate GRM (binary)  →  genesis/pcrelate_relatedness.grm.{id,bin,N.bin}
+#   - PC-Relate GRM (text gz) →  genesis/pcrelate_relatedness.grm.gz
+#   - PC-Relate GRM pairwise  →  genesis/pcrelate_relatedness.tsv
+#   - PC-AiR 32 PCs clean     →  genesis/pcair_weights.tsv
+#   - CNV slim clean          →  cnv/CNV_slim_clean.txt
 #
 # Usage: python 29-filter_release_outputs.py [--release-dir /path]
 # Default release from HBCD_RELEASE env var or br_21p3.
@@ -28,6 +28,8 @@ else:
     RELEASE_DIR = get_release_dir()
 
 release_base = RELEASE_DIR.parent
+genesis_dir = RELEASE_DIR / "genesis"
+cnv_dir = RELEASE_DIR / "cnv"
 
 keep = pd.read_csv(
     release_base / "keep_list.txt",
@@ -143,55 +145,55 @@ def filter_grm_text_gz(in_path, orig_id_path, out_path):
 # ===========================================================================
 # PC-Relate GRM (binary)
 # ===========================================================================
-print("\n--- PC-Relate GRM (binary) ---")
+print("\n--- PC-Relate GRM (binary) → genesis/ ---")
 filter_binary_grm(
     str(HANDOFF_DIR / "hbcd_pcrelate_grm"),
-    str(RELEASE_DIR / "hbcd_pcrelate_grm"),
+    str(genesis_dir / "pcrelate_relatedness"),
     id_ext=".grm.id", bin_ext=".grm.bin", n_ext=".grm.N.bin",
 )
 
 # ===========================================================================
 # PC-Relate GRM (gzipped text)
 # ===========================================================================
-print("\n--- PC-Relate GRM (text gz) ---")
+print("\n--- PC-Relate GRM (text gz) → genesis/ ---")
 filter_grm_text_gz(
     HANDOFF_DIR / "hbcd_pcrelate_grm.grm.gz",
     HANDOFF_DIR / "hbcd_pcrelate_grm.grm.id",
-    RELEASE_DIR / "hbcd_pcrelate_grm.grm.gz",
+    genesis_dir / "pcrelate_relatedness.grm.gz",
 )
 
 # ===========================================================================
 # PC-Relate GRM pairwise
 # ===========================================================================
-print("\n--- PC-Relate GRM pairwise ---")
+print("\n--- PC-Relate GRM pairwise → genesis/ ---")
 filter_csv(
     HANDOFF_DIR / "hbcd_pcrelate_grm_pairwise.tsv",
-    RELEASE_DIR / "hbcd_pcrelate_grm_pairwise.tsv",
+    genesis_dir / "pcrelate_relatedness.tsv",
     ["ID1", "ID2"], sep="\t",
 )
 
 # ===========================================================================
 # PC-AiR 32 PCs clean
 # ===========================================================================
-print("\n--- PC-AiR 32 PCs clean ---")
+print("\n--- PC-AiR 32 PCs clean → genesis/ ---")
 filter_text(
     HANDOFF_DIR / "hbcd_pcair_32PCs_clean.tsv",
     "subject_id",
-    RELEASE_DIR / "hbcd_pcair_32PCs_clean.tsv",
+    genesis_dir / "pcair_weights.tsv",
 )
 
 # ===========================================================================
 # CNV slim clean (de-identified by 28-cnv-deid.py)
 # ===========================================================================
-print("\n--- CNV slim clean ---")
-cnv_path = release_base / "CNV_slim_clean_deid.txt"
+print("\n--- CNV slim clean → cnv/ ---")
+cnv_path = cnv_dir / "CNV_slim_clean_deid.txt"
 if not cnv_path.exists():
     print(f"  SKIP (not found — run 28-cnv-deid.py first): {cnv_path}")
 else:
     cnv = pd.read_csv(cnv_path, sep="\t", dtype=str)
     before = len(cnv)
     cnv = cnv[cnv["sample_id"].isin(release_iids)]
-    cnv_out = RELEASE_DIR / "CNV_slim_clean.txt"
+    cnv_out = cnv_dir / "CNV_slim_clean.txt"
     cnv_out.parent.mkdir(parents=True, exist_ok=True)
     cnv.to_csv(cnv_out, sep="\t", index=False)
     print(f"  CNV_slim_clean.txt: {before} → {len(cnv)} rows ({((before - len(cnv)) / before * 100):.1f}% removed)")

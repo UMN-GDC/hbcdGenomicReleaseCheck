@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# step 3: filter batch and genomics data for the HBCD release
+# step 25: filter batch and genomics data for the HBCD release
 # source /projects/standard/basu_hbcd/shared/.venv/bin/activate
 
 import pandas as pd
@@ -19,6 +19,8 @@ from _lib import (
 data_prefix = DATA_DIR / "onlyQc"
 release_dir = get_release_dir()
 release_dir.mkdir(parents=True, exist_ok=True)
+gda_dir = release_dir / "GDA"
+gda_dir.mkdir(parents=True, exist_ok=True)
 release_base = get_release_base()
 
 # -- identifiers --
@@ -158,21 +160,21 @@ valid[["new_FID", "new_IID"]].to_csv(
 valid[["new_IID", "visit", "plate_number"]].rename(
     columns={"new_IID": "IID"}
 ).to_csv(
-    release_dir / "batch.info",
+    gda_dir / "batch.info",
     sep="\t",
     index=False,
 )
 
-# -- write Removed_individuals.txt --
+# -- write GDA/removed_individuals.txt --
 exc = load_excluded_with_relationship()
 exc["IID"] = (
     exc["release_candid"].astype(int).astype(str)
     + exc["relationship"].fillna("")
 )
 exc[["IID"]].drop_duplicates().to_csv(
-    release_dir / "Removed_individuals.txt",
+    gda_dir / "removed_individuals.txt",
     sep=" ",
     index=False,
     header=False,
 )
-print(f"  Removed_individuals.txt        : {len(exc):>6}")
+print(f"  GDA/removed_individuals.txt    : {len(exc):>6}")

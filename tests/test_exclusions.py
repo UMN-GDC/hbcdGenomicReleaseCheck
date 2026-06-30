@@ -2,8 +2,8 @@
 
 Three independent exclusion mechanisms are checked:
   1. HBCDexclusions.csv        — pscid-level exclusion (multi-column reasons)
-  2. Excel exclusion list      — release_candid-level exclusion
-  3. Removed_individuals.txt   — IID-level exclusion written by the pipeline
+   2. Excel exclusion list          — release_candid-level exclusion
+   3. GDA/removed_individuals.txt   — IID-level exclusion written by the pipeline
 
 Set ``HBCD_RELEASE`` env var to test against a different release.
 """
@@ -19,11 +19,14 @@ from _lib import (
     load_identifiers,
 )
 
+RELEASE_DIR = get_release_dir()
+GDA_DIR = RELEASE_DIR / "GDA"
+
 
 def _load_hbcd_fam():
-    p = get_release_dir() / "hbcd.fam"
+    p = GDA_DIR / "merged_chroms.fam"
     if not p.exists():
-        pytest.skip("hbcd.fam not found — run pipeline first")
+        pytest.skip("merged_chroms.fam not found — run pipeline first")
     return pd.read_csv(
         p, sep=r"\s+", header=None,
         names=["FID", "IID", "PAT", "MAT", "SEX", "PHENO"],
@@ -44,7 +47,7 @@ def _fam_iids(fam):
 
 def test_hbcdcsv_excluded_pscids_absent():
     """Every pscid listed in HBCDexclusions.csv maps to a release_candid
-    that is NOT present in hbcd.fam."""
+    that is NOT present in GDA/merged_chroms.fam."""
     hbcd = _load_hbcd_fam()
     fam_rc = _fam_release_candids(hbcd)
 
@@ -60,7 +63,7 @@ def test_hbcdcsv_excluded_pscids_absent():
     overlap = fam_rc & exc_rc
     assert len(overlap) == 0, (
         f"{len(overlap)} HBCDexclusions pscid(s) map to release_candid "
-        f"found in hbcd.fam: {sorted(overlap)[:20]}"
+        f"found in GDA/merged_chroms.fam: {sorted(overlap)[:20]}"
     )
 
 
@@ -84,7 +87,7 @@ def test_each_hbcdcsv_exclusion_reason_individually():
         overlap = fam_rc & col_rc
         assert len(overlap) == 0, (
             f"{len(overlap)} subject(s) from HBCDexclusions column "
-            f"'{col}' present in hbcd.fam: {sorted(overlap)[:15]}"
+            f"'{col}' present in GDA/merged_chroms.fam: {sorted(overlap)[:15]}"
         )
 
 
@@ -93,7 +96,7 @@ def test_each_hbcdcsv_exclusion_reason_individually():
 
 def test_excel_excluded_release_candids_absent():
     """Every release_candid marked for exclusion in the Excel spreadsheet
-    is absent from hbcd.fam."""
+    is absent from GDA/merged_chroms.fam."""
     hbcd = _load_hbcd_fam()
     fam_rc = _fam_release_candids(hbcd)
 
@@ -103,26 +106,26 @@ def test_excel_excluded_release_candids_absent():
     overlap = fam_rc & exc_rc
     assert len(overlap) == 0, (
         f"{len(overlap)} Excel-excluded release_candid(s) "
-        f"present in hbcd.fam: {sorted(overlap)[:20]}"
+        f"present in GDA/merged_chroms.fam: {sorted(overlap)[:20]}"
     )
 
 
-# ── 3. Removed_individuals.txt (IID-level, written by pipeline) ──────────
+# ── 3. GDA/removed_individuals.txt (IID-level, written by pipeline) ──────
 
 
 def test_removed_individuals_absent():
-    """Every IID listed in Removed_individuals.txt is absent from hbcd.fam."""
+    """Every IID listed in GDA/removed_individuals.txt is absent from merged_chroms.fam."""
     hbcd = _load_hbcd_fam()
     fam_iids = _fam_iids(hbcd)
 
-    p = get_release_dir() / "Removed_individuals.txt"
+    p = GDA_DIR / "removed_individuals.txt"
     if not p.exists():
-        pytest.skip("Removed_individuals.txt not found")
+        pytest.skip("GDA/removed_individuals.txt not found")
     removed = pd.read_csv(p, delim_whitespace=True, header=None, names=["IID"])
     removed_iids = set(removed["IID"].astype(str))
 
     overlap = fam_iids & removed_iids
     assert len(overlap) == 0, (
-        f"{len(overlap)} removed IID(s) present in hbcd.fam: "
+        f"{len(overlap)} removed IID(s) present in merged_chroms.fam: "
         f"{sorted(overlap)[:20]}"
     )

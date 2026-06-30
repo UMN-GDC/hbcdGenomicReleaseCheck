@@ -12,19 +12,19 @@ _RELEASE_ENV = os.environ.get("HBCD_RELEASE", DEFAULT_RELEASE)
 
 
 def get_release_dir(release=None):
-    """Return the release data directory, from env var or explicit argument.
+    """Return the release genotype_microarray directory, from env var or explicit argument.
 
-    The directory is ``<DATA_DIR.parent>/HBCD_genomics_release_<release>/data/``.
+    The directory is ``<DATA_DIR.parent>/HBCD_genomics_release_<release>/genotype_microarray/``.
     If *release* is ``None`` (default) the ``HBCD_RELEASE`` environment
     variable is consulted, falling back to ``DEFAULT_RELEASE``.
     """
     if release is None:
         release = _RELEASE_ENV
-    return DATA_DIR.parent / f"HBCD_genomics_release_{release}" / "data"
+    return DATA_DIR.parent / f"HBCD_genomics_release_{release}" / "genotype_microarray"
 
 
 def get_release_base(release=None):
-    """Return the release base directory (parent of ``data/``)."""
+    """Return the release base directory (parent of ``genotype_microarray/``)."""
     return get_release_dir(release).parent
 
 
