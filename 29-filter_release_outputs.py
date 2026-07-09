@@ -214,4 +214,48 @@ else:
     bm.to_csv(bm_out, sep=",", index=False)
     print(f"  HBCD_CNV_bookmark_metrics_clean.csv: {bm_before} → {len(bm)} rows ({((bm_before - len(bm)) / bm_before * 100):.1f}% removed)")
 
+# ===========================================================================
+# Cross-form subject count consistency
+# ===========================================================================
+print("\n--- Cross-form subject count consistency ---")
+
+def _unique_iids_from(path, id_col, sep="\t"):
+    if not path.exists():
+        return set()
+    df = pd.read_csv(path, sep=sep, dtype=str)
+    return set(df[id_col].dropna().astype(str))
+
+cnv_iids = _unique_iids_from(cnv_dir / "CNV_slim.txt", "sample_id", sep="\t")
+bm_iids = _unique_iids_from(cnv_dir / "HBCD_CNV_bookmark_metrics_clean.csv", "sample_id", sep=",")
+
+if cnv_iids:
+    rc_cnv = set(i[:-1] for i in cnv_iids)
+    print(f"  CNV_slim.txt unique subjects        : {len(rc_cnv):>6}")
+if bm_iids:
+    rc_bm = set(i[:-1] for i in bm_iids)
+    print(f"  Bookmarks unique subjects           : {len(rc_bm):>6}")
+
+if cnv_iids and bm_iids:
+    common = rc_cnv & rc_bm
+    only_cnv = rc_cnv - rc_bm
+    only_bm = rc_bm - rc_cnv
+    print(f"  Subjects in BOTH CNV+Bookmarks     : {len(common):>6}")
+    print(f"  Subjects ONLY in CNV               : {len(only_cnv):>6}")
+    print(f"  Subjects ONLY in Bookmarks          : {len(only_bm):>6}")
+    if only_cnv:
+        print(f"    e.g. {sorted(only_cnv)[:5]}")
+    if only_bm:
+        print(f"    e.g. {sorted(only_bm)[:5]}")
+
+print(f"\nReference release_iids (keep_list.txt): {len(release_iids):>6}")
+if cnv_iids:
+    missing_from_release = cnv_iids - release_iids
+    if missing_from_release:
+        print(f"  WARN: {len(missing_from_release)} CNV IID(s) not in release set")
+if bm_iids:
+    missing_from_release = bm_iids - release_iids
+    if missing_from_release:
+        print(f"  WARN: {len(missing_from_release)} bookmark IID(s) not in release set")
+
+# Compare to fam (release GDA set)
 print("\nDone.")

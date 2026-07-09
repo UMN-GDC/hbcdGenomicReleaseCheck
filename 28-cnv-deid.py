@@ -52,7 +52,9 @@ cnv["release_candid"] = cnv["release_candid"].astype(int)
 # ── build de-identified IID ────────────────────────────────────────────
 cnv["sample_id"] = cnv["release_candid"].astype(str) + cnv["type"]
 cnv = cnv.drop(columns=["type", "_pscid_orig", "release_candid"])
-print(f"  De-identified rows: {len(cnv)}")
+cnv_unique = cnv["sample_id"].str[:-1].unique()
+cnv_n_subjects = len(cnv_unique)
+print(f"  De-identified rows: {len(cnv)}, unique subjects: {cnv_n_subjects}")
 
 # ── write de-identified CNV (no filtering) ────────────────────────────
 cnv.to_csv(CNV_DEID_OUT, sep="\t", index=False)
@@ -71,6 +73,12 @@ if not BM_INPUT.exists():
     print(f"  SKIP (not found): {BM_INPUT}")
 else:
     import shutil
+    bm_src = pd.read_csv(BM_INPUT, sep=",", dtype=str)
+    bm_unique = bm_src["sample_id"].str[:-1].unique()
+    bm_n_subjects = len(bm_unique)
     CNV_DEID_DIR.mkdir(parents=True, exist_ok=True)
     shutil.copy2(BM_INPUT, BM_DEID_OUT)
     print(f"  Copied: {BM_INPUT} → {BM_DEID_OUT}")
+    print(f"  Rows: {len(bm_src)}, unique subjects: {bm_n_subjects}")
+    print(f"  Subject overlap with CNV slim: {len(set(cnv_unique) & set(bm_unique))} / "
+          f"{cnv_n_subjects} CNV slim subjects")

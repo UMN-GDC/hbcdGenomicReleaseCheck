@@ -298,11 +298,80 @@ _check_file(
 )
 
 # ══════════════════════════════════════════════════════════════════════════
+# 5. Cross-form subject count consistency
+# ══════════════════════════════════════════════════════════════════════════
+
+_sep("Cross-form subject count consistency")
+
+def _unique_rc_from(path, id_col, sep="\t"):
+    if not path.exists():
+        return set()
+    df = pd.read_csv(path, sep=sep, dtype=str)
+    iids = df[id_col].dropna().astype(str)
+    return set(i.str[:-1] for i in iids)
+
+fam_rc_set = fam_rc if fam_path.exists() else set()
+release_rc = set(i[:-1] for i in release_iids) if release_iids else set()
+
+derivatives = []
+if genesis_dir.exists():
+    for f in genesis_dir.glob("*"):
+        derivatives.append(("genesis/" + f.name, f))
+
+if cnv_dir.exists():
+    for f in cnv_dir.glob("*"):
+        derivatives.append(("cnv/" + f.name, f))
+
+for label, path in derivatives:
+    if path.suffix in (".bin", ".N.bin", ".gz", ".zip"):
+        continue
+    if ".grm.id" in path.name:
+        df = pd.read_csv(path, sep=r"\s+", header=None, dtype=str)
+        ids = set(df[1].dropna().astype(str))
+        rc_set = set(i[:-1] for i in ids)
+    elif path.name == "CNV_slim.txt":
+        rc_set = _unique_rc_from(path, "sample_id", sep="\t")
+    elif path.name == "HBCD_CNV_bookmark_metrics_clean.csv":
+        rc_set = _unique_rc_from(path, "sample_id", sep=",")
+    elif path.name.endswith(".tsv"):
+        df = pd.read_csv(path, sep="\t", dtype=str)
+        ids = set()
+        for col in df.columns:
+            if col in ("ID1", "ID2", "subject_id"):
+                ids.update(df[col].dropna().astype(str))
+        rc_set = set(i[:-1] for i in ids)
+    elif path.name.endswith(".id"):
+        df = pd.read_csv(path, sep=r"\s+", header=None, dtype=str)
+        ids = set(df[1].dropna().astype(str))
+        rc_set = set(i[:-1] for i in ids)
+    else:
+        continue
+
+    n = len(rc_set)
+    match_fam = "✓" if rc_set == fam_rc_set else ("DIFF" if fam_rc_set else "?")
+    match_release = "✓" if rc_set == release_rc else ("DIFF" if release_rc else "?")
+    print(f"  [{match_fam}/{match_release}]  {label}")
+    print(f"           unique subjects: {n:>6}")
+    if fam_rc_set:
+        missing_in_fam = rc_set - fam_rc_set
+        extra_in_fam = fam_rc_set - rc_set
+        if missing_in_fam:
+            print(f"           subjects NOT in fam: {len(missing_in_fam):>6}  "
+                  f"e.g. {sorted(missing_in_fam)[:5]}")
+        if extra_in_fam:
+            print(f"           subjects in fam NOT in file: {len(extra_in_fam):>6}  "
+                  f"e.g. {sorted(extra_in_fam)[:5]}")
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # Summary
 # ══════════════════════════════════════════════════════════════════════════
 
 _sep()
 print("Validation complete.")
-print(f"  Excluded pscids : {len(excluded_pscids)}")
-print(f"  Excluded RC     : {len(exc_rc)}")
-print(f"  Excluded IIDs   : {len(exc_iids)}")
+n_fam = len(fam_rc) if fam_path.exists() else 0
+print(f"  Release RC (merged_chroms.fam): {n_fam}")
+print(f"  Release IIDs (keep_list.txt)  : {len(release_iids)}")
+print(f"  Excluded pscids               : {len(excluded_pscids)}")
+print(f"  Excluded RC                   : {len(exc_rc)}")
+print(f"  Excluded IIDs                 : {len(exc_iids)}")
