@@ -308,7 +308,7 @@ def _unique_rc_from(path, id_col, sep="\t"):
         return set()
     df = pd.read_csv(path, sep=sep, dtype=str)
     iids = df[id_col].dropna().astype(str)
-    return set(i.str[:-1] for i in iids)
+    return set(i[:-1] for i in iids)
 
 fam_rc_set = fam_rc if fam_path.exists() else set()
 release_rc = set(i[:-1] for i in release_iids) if release_iids else set()
