@@ -9,7 +9,7 @@
 #   - PC-Relate GRM (text gz) →  genesis/pcrelate_relatedness.grm.gz
 #   - PC-Relate GRM pairwise  →  genesis/pcrelate_relatedness.tsv
 #   - PC-AiR 32 PCs clean     →  genesis/pcair_weights.tsv
-#   - CNV slim clean          →  cnv/CNV_slim_clean.txt
+#   - CNV slim clean          →  cnv/CNV_slim.txt
 #
 # Usage: python 29-filter_release_outputs.py [--release-dir /path]
 # Default release from HBCD_RELEASE env var or br_21p3.
@@ -186,16 +186,32 @@ filter_text(
 # CNV slim clean (de-identified by 28-cnv-deid.py)
 # ===========================================================================
 print("\n--- CNV slim clean → cnv/ ---")
-cnv_path = cnv_dir / "CNV_slim_clean_deid.txt"
+cnv_path = cnv_dir / "CNV_slim_deid.txt"
 if not cnv_path.exists():
     print(f"  SKIP (not found — run 28-cnv-deid.py first): {cnv_path}")
 else:
     cnv = pd.read_csv(cnv_path, sep="\t", dtype=str)
     before = len(cnv)
     cnv = cnv[cnv["sample_id"].isin(release_iids)]
-    cnv_out = cnv_dir / "CNV_slim_clean.txt"
+    cnv_out = cnv_dir / "CNV_slim.txt"
     cnv_out.parent.mkdir(parents=True, exist_ok=True)
     cnv.to_csv(cnv_out, sep="\t", index=False)
-    print(f"  CNV_slim_clean.txt: {before} → {len(cnv)} rows ({((before - len(cnv)) / before * 100):.1f}% removed)")
+    print(f"  CNV_slim.txt: {before} → {len(cnv)} rows ({((before - len(cnv)) / before * 100):.1f}% removed)")
+
+# ===========================================================================
+# CNV bookmark metrics (de-identified by 28-cnv-deid.py)
+# ===========================================================================
+print("\n--- CNV bookmark metrics → cnv/ ---")
+bm_deid_path = cnv_dir / "HBCD_CNV_bookmark_metrics_clean_deid.csv"
+if not bm_deid_path.exists():
+    print(f"  SKIP (not found — run 28-cnv-deid.py first): {bm_deid_path}")
+else:
+    bm = pd.read_csv(bm_deid_path, sep=",", dtype=str)
+    bm_before = len(bm)
+    bm = bm[bm["sample_id"].isin(release_iids)]
+    bm_out = cnv_dir / "HBCD_CNV_bookmark_metrics_clean.csv"
+    bm_out.parent.mkdir(parents=True, exist_ok=True)
+    bm.to_csv(bm_out, sep=",", index=False)
+    print(f"  HBCD_CNV_bookmark_metrics_clean.csv: {bm_before} → {len(bm)} rows ({((bm_before - len(bm)) / bm_before * 100):.1f}% removed)")
 
 print("\nDone.")

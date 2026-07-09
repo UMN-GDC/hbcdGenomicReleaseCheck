@@ -498,14 +498,28 @@ def test_pcrelate_grm_gz_ids_are_release():
 
 
 def test_cnv_slim_clean_ids_are_release():
-    """All sample_id in cnv/CNV_slim_clean.txt are release IIDs."""
-    p = CNV_DIR / "CNV_slim_clean.txt"
+    """All sample_id in cnv/CNV_slim.txt are release IIDs."""
+    p = CNV_DIR / "CNV_slim.txt"
     if not p.exists():
-        pytest.skip("cnv/CNV_slim_clean.txt not found")
+        pytest.skip("cnv/CNV_slim.txt not found")
     df = pd.read_csv(p, sep="\t", dtype=str)
     ids = set(df["sample_id"].dropna().astype(str))
     extra = ids - _release_iids()
     assert len(extra) == 0, (
-        f"{len(extra)} sample_id(s) in CNV_slim_clean.txt not in release set: "
+        f"{len(extra)} sample_id(s) in CNV_slim.txt not in release set: "
+        f"{sorted(extra)[:10]}"
+    )
+
+
+def test_cnv_bookmark_ids_are_release():
+    """All sample_id in cnv/HBCD_CNV_bookmark_metrics_clean.csv are release IIDs."""
+    p = CNV_DIR / "HBCD_CNV_bookmark_metrics_clean.csv"
+    if not p.exists():
+        pytest.skip("cnv/HBCD_CNV_bookmark_metrics_clean.csv not found")
+    df = pd.read_csv(p, sep=",", dtype=str)
+    ids = set(df["sample_id"].dropna().astype(str))
+    extra = ids - _release_iids()
+    assert len(extra) == 0, (
+        f"{len(extra)} sample_id(s) in HBCD_CNV_bookmark_metrics_clean.csv not in release set: "
         f"{sorted(extra)[:10]}"
     )

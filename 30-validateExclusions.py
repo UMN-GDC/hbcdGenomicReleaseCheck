@@ -282,10 +282,19 @@ else:
 # ── CNV slim clean (cnv/) ────────────────────────────────────────────────
 
 _check_file(
-    cnv_dir / "CNV_slim_clean.txt",
-    "cnv/CNV_slim_clean.txt",
+    cnv_dir / "CNV_slim.txt",
+    "cnv/CNV_slim.txt",
     ["sample_id"],
     reader="tsv",
+)
+
+# ── CNV bookmark metrics (cnv/) ──────────────────────────────────────────
+
+_check_file(
+    cnv_dir / "HBCD_CNV_bookmark_metrics_clean.csv",
+    "cnv/HBCD_CNV_bookmark_metrics_clean.csv",
+    ["sample_id"],
+    reader="csv",
 )
 
 # ══════════════════════════════════════════════════════════════════════════

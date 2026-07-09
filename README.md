@@ -98,8 +98,8 @@ file that was never de-identified (CNV).
 | 25 | `filterGenotypeFiles.py` | **De-ID + Filter** | de-IDed `onlyQc.{bed,bim,fam}`, identifiers, exclusions | `keep_list.txt`, `temp.fam`, `GDA/batch.info`, `GDA/removed_individuals.txt` |
 | 26 | `run_plink_filter.sh` | Filter | `onlyQc`, `temp.fam`, `keep_list.txt` | `GDA/merged_chroms.{bed,bim,fam}` |
 | 27 | `filter_imputed_vcf.SLURM` | Filter | imputed VCFs (c1/c2/c3/cX), `keep_list.txt` | filtered `imputed/chr*_dose.vcf.gz` |
-| 28 | `cnv-deid.py` | **De-ID** | `data_handoff/CNV_slim_clean.txt`, identifiers | de-IDed `cnv/CNV_slim_clean_deid.txt` |
-| 29 | `filter_release_outputs.py` | Filter | de-IDed handoff files, `keep_list.txt` | filtered genesis/ + cnv/ files |
+| 28 | `cnv-deid.py` | **De-ID** | `data_handoff/CNV_slim_clean.txt`, identifiers; `data_handoff/HBCD_CNV_bookmark_metrics_clean.csv` (copied as-is) | de-IDed `cnv/CNV_slim_deid.txt`, copied `cnv/HBCD_CNV_bookmark_metrics_clean_deid.csv` |
+| 29 | `filter_release_outputs.py` | Filter | de-IDed handoff files (GRM, PCs, CNV, bookmarks), `keep_list.txt` | filtered genesis/ + cnv/ files |
 | 30 | `validateExclusions.py` | — | all release output files | console validation report |
 
 ## Release directory
@@ -127,7 +127,8 @@ export HBCD_RELEASE=br_21p3
 #   │   ├── imputed/
 #   │   │   └── chr*_dose.vcf.gz + .tbi
 #   │   └── cnv/
-#   │       └── CNV_slim_clean.txt
+#   │       ├── CNV_slim.txt
+#   │       └── HBCD_CNV_bookmark_metrics_clean.csv
 #   ├── keep_list.txt
 #   └── temp.fam
 ```
@@ -218,22 +219,29 @@ sbatch 27-filter_imputed_vcf.SLURM
 
 ---
 
-## Phase C, step 28: De-identify CNV calls (de-ID only)
+## Phase C, step 28: De-identify CNV calls + bookmarks (de-ID only)
 
-CNV arrives with raw pscid-level IDs from `data_handoff/` (external source).
+CNV files arrive with raw pscid-level IDs from `data_handoff/` (external source).
 This step maps pscid → `release_candid` **without filtering**, so a 3rd party
 can handle only de-identified data downstream.
 
+### CNV slim clean
+
 Source file: `data_handoff/CNV_slim_clean.txt` — sample IDs are in the format
 `{array}_{channel}_{pscid}{C|M}` (e.g. `GSM0000000_Grn_12345C`).
-
-`28-cnv-deid.py`:
 
 1. Reads `data_handoff/CNV_slim_clean.txt`
 2. Extracts pscid + relationship suffix (C/M) from each `sample_id`
 3. Maps pscid → `release_candid` via the identifiers crosswalk
 4. Builds de-identified IIDs (`{release_candid}{C|M}`)
-5. Writes de-identified `CNV_slim_clean_deid.txt` back to `data_handoff/`
+5. Writes de-identified `cnv/CNV_slim_deid.txt`
+
+### CNV bookmark metrics (already de-identified)
+
+Source file: `data_handoff/HBCD_CNV_bookmark_metrics_clean.csv` — sample IDs
+are already in de-identified format (`{release_candid}{C|M}`, e.g. `2910626018M`).
+
+Copied as-is to `cnv/HBCD_CNV_bookmark_metrics_clean_deid.csv` (no de-ID needed).
 
 ```bash
 conda run -n python python 28-cnv-deid.py
@@ -257,7 +265,8 @@ Filtering methods per file type (outputs → `genesis/` or `cnv/`):
 | `genesis/pcrelate_relatedness.grm.gz` | IID1, IID2 | `filter_grm_text_gz()` |
 | `genesis/pcair_weights.tsv` | `subject_id` | `filter_text()` |
 | `genesis/pcrelate_relatedness.tsv` | `ID1`, `ID2` | `filter_csv()` |
-| `cnv/CNV_slim_clean.txt` | `sample_id` | inline filter |
+| `cnv/CNV_slim.txt` | `sample_id` | inline filter |
+| `cnv/HBCD_CNV_bookmark_metrics_clean.csv` | `sample_id` | inline filter |
 
 ```bash
 conda run -n python python 29-filter_release_outputs.py
@@ -291,7 +300,8 @@ and checks for contamination by excluded subjects:
 - **HBCDexclusions.csv** — per-column, mapped to release_candid
 - **All derivative files** — IID columns checked against the excluded-IID set
   (`{exc_rc}C` / `{exc_rc}M`)
-- **cnv/CNV_slim_clean.txt** — `sample_id` column
+- **cnv/CNV_slim.txt** — `sample_id` column
+- **cnv/HBCD_CNV_bookmark_metrics_clean.csv** — `sample_id` column
 - **Cross-check** — warns if any IID is found that's neither in the release set
   nor the exclusion set (catches unexpected subjects)
 
@@ -362,7 +372,7 @@ python 30-validateExclusions.py
 python -m pytest tests/ -v
 ```
 
-Step 28 must re-run because the CNV source file (`CNV_slim_clean.txt`) always
+Step 28 must re-run because the CNV source files (`data_handoff/CNV_slim_clean.txt`, `data_handoff/HBCD_CNV_bookmark_metrics_clean.csv`) always
 retains raw pscid IDs in `data_handoff/` — the de-identified copy is rebuilt
 fresh from the original pscid-level data each time, then step 29 re-filters
 everything together.
@@ -396,7 +406,8 @@ IID checks for release derivative outputs:
 | `test_pcrelate_grm_dimensions` | genesis/pcrelate_relatedness.grm.id rows = merged_chroms.fam rows |
 | `test_pcair_32pcs_clean_ids_are_release` | All subject_ids in genesis/pcair_weights.tsv are release |
 | `test_pcrelate_grm_pairwise_ids_are_release` | All ID1/ID2 in genesis/pcrelate_relatedness.tsv are release |
-| `test_cnv_slim_clean_ids_are_release` | All sample_ids in cnv/CNV_slim_clean.txt are release |
+| `test_cnv_slim_clean_ids_are_release` | All sample_ids in cnv/CNV_slim.txt are release |
+| `test_cnv_bookmark_ids_are_release` | All sample_ids in cnv/HBCD_CNV_bookmark_metrics_clean.csv are release |
 
 ### `tests/test_exclusions.py` — 4 tests
 
