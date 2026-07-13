@@ -20,6 +20,8 @@ import numpy as np
 from pathlib import Path
 from _lib import DATA_DIR, get_release_dir
 
+
+
 HANDOFF_DIR = DATA_DIR.parent / "data_handoff"
 
 if len(sys.argv) > 1 and sys.argv[1] in ("--release-dir", "-r"):
@@ -187,32 +189,26 @@ filter_text(
 # ===========================================================================
 print("\n--- CNV slim clean → cnv/ ---")
 cnv_path = cnv_dir / "CNV_slim_deid.txt"
-if not cnv_path.exists():
-    print(f"  SKIP (not found — run 28-cnv-deid.py first): {cnv_path}")
-else:
-    cnv = pd.read_csv(cnv_path, sep="\t", dtype=str)
-    before = len(cnv)
-    cnv = cnv[cnv["sample_id"].isin(release_iids)]
-    cnv_out = cnv_dir / "CNV_slim.txt"
-    cnv_out.parent.mkdir(parents=True, exist_ok=True)
-    cnv.to_csv(cnv_out, sep="\t", index=False)
-    print(f"  CNV_slim.txt: {before} → {len(cnv)} rows ({((before - len(cnv)) / before * 100):.1f}% removed)")
+cnv = pd.read_csv(cnv_path, sep="\t", dtype=str)
+before = len(np.unique(cnv.sample_id))
+cnv = cnv[cnv["sample_id"].isin(release_iids)]
+cnv_out = cnv_dir / "CNV_slim.txt"
+cnv_out.parent.mkdir(parents=True, exist_ok=True)
+cnv.to_csv(cnv_out, sep="\t", index=False)
+print(f"  CNV_slim.txt: {before} → {len(np.unique(cnv.sample_id))} unique Subjects")
 
 # ===========================================================================
 # CNV bookmark metrics (de-identified by 28-cnv-deid.py)
 # ===========================================================================
 print("\n--- CNV bookmark metrics → cnv/ ---")
 bm_deid_path = cnv_dir / "HBCD_CNV_bookmark_metrics_clean_deid.csv"
-if not bm_deid_path.exists():
-    print(f"  SKIP (not found — run 28-cnv-deid.py first): {bm_deid_path}")
-else:
-    bm = pd.read_csv(bm_deid_path, sep=",", dtype=str)
-    bm_before = len(bm)
-    bm = bm[bm["sample_id"].isin(release_iids)]
-    bm_out = cnv_dir / "HBCD_CNV_bookmark_metrics_clean.csv"
-    bm_out.parent.mkdir(parents=True, exist_ok=True)
-    bm.to_csv(bm_out, sep=",", index=False)
-    print(f"  HBCD_CNV_bookmark_metrics_clean.csv: {bm_before} → {len(bm)} rows ({((bm_before - len(bm)) / bm_before * 100):.1f}% removed)")
+bm = pd.read_csv(bm_deid_path, sep=",", dtype=str)
+bm_before = len(np.unique(bm.sample_id))
+bm = bm[bm["sample_id"].isin(release_iids)]
+bm_out = cnv_dir / "HBCD_CNV_bookmark_metrics_clean.csv"
+bm_out.parent.mkdir(parents=True, exist_ok=True)
+bm.to_csv(bm_out, sep=",", index=False)
+print(f"  HBCD_CNV_bookmark_metrics_clean.csv: {bm_before} → {len(np.unique(bm.sample_id))} unique Subjects")
 
 # ===========================================================================
 # Cross-form subject count consistency
@@ -228,34 +224,25 @@ def _unique_iids_from(path, id_col, sep="\t"):
 cnv_iids = _unique_iids_from(cnv_dir / "CNV_slim.txt", "sample_id", sep="\t")
 bm_iids = _unique_iids_from(cnv_dir / "HBCD_CNV_bookmark_metrics_clean.csv", "sample_id", sep=",")
 
-if cnv_iids:
-    rc_cnv = set(i[:-1] for i in cnv_iids)
-    print(f"  CNV_slim.txt unique subjects        : {len(rc_cnv):>6}")
-if bm_iids:
-    rc_bm = set(i[:-1] for i in bm_iids)
-    print(f"  Bookmarks unique subjects           : {len(rc_bm):>6}")
+rc_cnv = set(i[:-1] for i in cnv_iids)
+print(f"  CNV_slim.txt unique subjects        : {len(rc_cnv):>6}")
+rc_bm = set(i[:-1] for i in bm_iids)
+print(f"  Bookmarks unique subjects           : {len(rc_bm):>6}")
 
-if cnv_iids and bm_iids:
-    common = rc_cnv & rc_bm
-    only_cnv = rc_cnv - rc_bm
-    only_bm = rc_bm - rc_cnv
-    print(f"  Subjects in BOTH CNV+Bookmarks     : {len(common):>6}")
-    print(f"  Subjects ONLY in CNV               : {len(only_cnv):>6}")
-    print(f"  Subjects ONLY in Bookmarks          : {len(only_bm):>6}")
-    if only_cnv:
-        print(f"    e.g. {sorted(only_cnv)[:5]}")
-    if only_bm:
-        print(f"    e.g. {sorted(only_bm)[:5]}")
+common = rc_cnv & rc_bm
+only_cnv = rc_cnv - rc_bm
+only_bm = rc_bm - rc_cnv
+print(f"  Subjects in BOTH CNV+Bookmarks     : {len(common):>6}")
+print(f"  Subjects ONLY in CNV               : {len(only_cnv):>6}")
+print(f"  Subjects ONLY in Bookmarks          : {len(only_bm):>6}")
 
 print(f"\nReference release_iids (keep_list.txt): {len(release_iids):>6}")
-if cnv_iids:
-    missing_from_release = cnv_iids - release_iids
-    if missing_from_release:
-        print(f"  WARN: {len(missing_from_release)} CNV IID(s) not in release set")
-if bm_iids:
-    missing_from_release = bm_iids - release_iids
-    if missing_from_release:
-        print(f"  WARN: {len(missing_from_release)} bookmark IID(s) not in release set")
+missing_from_release = cnv_iids - release_iids
+if missing_from_release:
+    print(f"  WARN: {len(missing_from_release)} CNV IID(s) not in release set")
+missing_from_release = bm_iids - release_iids
+if missing_from_release:
+    print(f"  WARN: {len(missing_from_release)} bookmark IID(s) not in release set")
 
 # Compare to fam (release GDA set)
 print("\nDone.")
