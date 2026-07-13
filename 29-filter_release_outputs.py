@@ -18,6 +18,7 @@ import sys
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from datetime import datetime
 from _lib import DATA_DIR, get_release_dir
 
 
@@ -32,6 +33,23 @@ else:
 release_base = RELEASE_DIR.parent
 genesis_dir = RELEASE_DIR / "genesis"
 cnv_dir = RELEASE_DIR / "cnv"
+
+# ── tee stdout to log file ──────────────────────────────────────────────
+class _Tee:
+    def __init__(self, path):
+        self.file = open(path, "w", buffering=1)
+    def write(self, data):
+        sys.__stdout__.write(data)
+        self.file.write(data)
+    def flush(self):
+        sys.__stdout__.flush()
+        self.file.flush()
+
+release_base.mkdir(parents=True, exist_ok=True)
+_log_path = release_base / f"log_29_filter_release_outputs_{datetime.now():%Y%m%d_%H%M%S}.txt"
+_tee = _Tee(_log_path)
+sys.stdout = _tee
+print(f"Log: {_log_path}")
 
 keep = pd.read_csv(
     release_base / "keep_list.txt",
