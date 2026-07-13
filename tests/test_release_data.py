@@ -2,6 +2,9 @@
 
 Set ``HBCD_RELEASE`` env var to test against a different release.
 """
+import re
+import subprocess
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import pytest
@@ -19,6 +22,7 @@ RELEASE_DIR = get_release_dir()
 GDA_DIR = RELEASE_DIR / "GDA"
 GENESIS_DIR = RELEASE_DIR / "genesis"
 CNV_DIR = RELEASE_DIR / "cnv"
+IMPUTED_DIR = RELEASE_DIR / "imputed"
 NAME = "hbcd_rsid_harmonized"
 
 # ── helpers ──────────────────────────────────────────────────────────────
@@ -523,3 +527,192 @@ def test_cnv_bookmark_ids_are_release():
         f"{len(extra)} sample_id(s) in HBCD_CNV_bookmark_metrics_clean.csv not in release set: "
         f"{sorted(extra)[:10]}"
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  Imputed VCF integrity
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def _bcftools_available():
+    try:
+        subprocess.run(["bcftools", "--version"], capture_output=True)
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def test_imputed_vcf_sample_ids_deidentified():
+    """All sample IDs in imputed VCFs follow the de-identified pattern ^\\d{10}[CM]$."""
+    if not _bcftools_available():
+        pytest.skip("bcftools not on PATH")
+    if not IMPUTED_DIR.exists():
+        pytest.skip(f"imputed dir not found: {IMPUTED_DIR}")
+
+    pattern = re.compile(r"^\d{10}[CM]$")
+    vcfs = sorted(IMPUTED_DIR.glob("chr*_dose.vcf.gz"))
+    assert len(vcfs) > 0, "No imputed VCFs found"
+
+    for vcf in vcfs:
+        result = subprocess.run(
+            ["bcftools", "query", "-l", str(vcf)],
+            capture_output=True, text=True,
+        )
+        samples = result.stdout.strip().split()
+        bad = [s for s in samples if not pattern.match(s)]
+        assert len(bad) == 0, (
+            f"{vcf.name}: {len(bad)} non-deidentified samples: {bad[:5]}"
+        )
+
+
+def test_imputed_vcf_subject_count_matches_release():
+    """Each imputed VCF has the same number of samples as the release set."""
+    if not _bcftools_available():
+        pytest.skip("bcftools not on PATH")
+    if not IMPUTED_DIR.exists():
+        pytest.skip(f"imputed dir not found: {IMPUTED_DIR}")
+
+    release_n = len(_release_iids())
+    vcfs = sorted(IMPUTED_DIR.glob("chr*_dose.vcf.gz"))
+    assert len(vcfs) > 0, "No imputed VCFs found"
+
+    for vcf in vcfs:
+        result = subprocess.run(
+            ["bcftools", "query", "-l", str(vcf)],
+            capture_output=True, text=True,
+        )
+        n = len(result.stdout.strip().split())
+        assert n == release_n, (
+            f"{vcf.name}: {n} samples, expected {release_n}"
+        )
+
+
+def test_imputed_vcf_subject_set_matches_release():
+    """The set of subject IIDs in each imputed VCF matches the release set exactly."""
+    if not _bcftools_available():
+        pytest.skip("bcftools not on PATH")
+    if not IMPUTED_DIR.exists():
+        pytest.skip(f"imputed dir not found: {IMPUTED_DIR}")
+
+    release = _release_iids()
+    vcfs = sorted(IMPUTED_DIR.glob("chr*_dose.vcf.gz"))
+    assert len(vcfs) > 0, "No imputed VCFs found"
+
+    for vcf in vcfs:
+        result = subprocess.run(
+            ["bcftools", "query", "-l", str(vcf)],
+            capture_output=True, text=True,
+        )
+        vcf_iids = set(result.stdout.strip().split())
+        missing = release - vcf_iids
+        extra = vcf_iids - release
+        assert len(missing) == 0 and len(extra) == 0, (
+            f"{vcf.name}: {len(missing)} missing, {len(extra)} extra subjects"
+        )
+
+
+def test_imputed_vcf_genotype_concordance():
+    """For 3 subjects and 5 overlapping variants on chr22, verify that
+    genotypes match between PLINK and the de-identified imputed VCF.
+
+    This catches sample shuffling during the imputation VCF pipeline.
+    """
+    import tempfile
+    import shutil
+
+    if not _bcftools_available():
+        pytest.skip("bcftools not on PATH")
+    if shutil.which("plink2") is None:
+        pytest.skip("plink2 not on PATH")
+    if not IMPUTED_DIR.exists():
+        pytest.skip(f"imputed dir not found: {IMPUTED_DIR}")
+
+    chr22_vcf = IMPUTED_DIR / "chr22_dose.vcf.gz"
+    if not chr22_vcf.exists():
+        pytest.skip("chr22_dose.vcf.gz not found — can't check concordance")
+
+    bim = pd.read_csv(
+        GDA_DIR / "merged_chroms.bim",
+        sep=r"\s+", header=None,
+        names=["CHR", "SNP", "GD", "BP", "A1", "A2"],
+    )
+    bim_chr22 = bim[bim["CHR"] == 22]
+    if len(bim_chr22) == 0:
+        pytest.skip("No chr22 variants in PLINK data")
+
+    result = subprocess.run(
+        ["bcftools", "query", "-f", "%CHROM\t%POS\n", str(chr22_vcf)],
+        capture_output=True, text=True,
+    )
+    vcf_positions = set()
+    for line in result.stdout.strip().split("\n"):
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            vcf_positions.add(int(parts[1]))
+
+    overlapping = sorted(set(bim_chr22["BP"].astype(int)) & vcf_positions)
+    if len(overlapping) < 3:
+        pytest.skip(f"Only {len(overlapping)} overlapping positions on chr22")
+
+    test_positions = overlapping[:5]
+    test_iids = sorted(_release_iids())[:3]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmpdir = Path(tmp)
+
+        with open(tmpdir / "keep.txt", "w") as f:
+            for iid in test_iids:
+                f.write(f"0 {iid}\n")
+
+        with open(tmpdir / "extract.txt", "w") as f:
+            for bp in test_positions:
+                f.write(f"22:{bp}\n")
+
+        subprocess.run(
+            [
+                "plink2",
+                "--bfile", str(GDA_DIR / "merged_chroms"),
+                "--chr", "22",
+                "--keep", str(tmpdir / "keep.txt"),
+                "--extract", str(tmpdir / "extract.txt"),
+                "--export", "vcf",
+                "--out", str(tmpdir / "plink_subset"),
+            ],
+            check=True, capture_output=True, text=True,
+        )
+
+        plink_vcf = tmpdir / "plink_subset.vcf"
+        if not plink_vcf.exists():
+            pytest.skip("plink2 VCF export failed")
+
+        plink_vcf_gz = tmpdir / "plink_subset.vcf.gz"
+        subprocess.run(["bgzip", "-c", str(plink_vcf)], check=True,
+                       stdout=open(plink_vcf_gz, "wb"))
+        subprocess.run(["tabix", "-f", "-p", "vcf", str(plink_vcf_gz)], check=True,
+                       capture_output=True, text=True)
+
+        # bcftools gtcheck compares GT at shared variant/sample intersections
+        gtcheck = subprocess.run(
+            [
+                "bcftools", "gtcheck",
+                "-g", str(chr22_vcf),
+                str(plink_vcf_gz),
+            ],
+            capture_output=True, text=True,
+        )
+
+        # Parse output for discordance count
+        discordant = 0
+        for line in gtcheck.stdout.strip().split("\n"):
+            if "\t" not in line:
+                continue
+            fields = line.split("\t")
+            if len(fields) >= 4 and fields[3].isdigit():
+                discordant += int(fields[3])
+
+        assert discordant == 0, (
+            f"{discordant} discordant genotype(s) between PLINK and imputed VCF "
+            f"at {len(test_positions)} positions for {len(test_iids)} subjects"
+        )
