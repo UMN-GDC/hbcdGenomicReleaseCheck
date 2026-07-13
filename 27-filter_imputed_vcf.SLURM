@@ -19,7 +19,8 @@ set -euo pipefail
 module load bcftools
 
 source ~/miniconda3/etc/profile.d/conda.sh
-conda activate python
+conda activate base
+source ../.venv/bin/activate
 
 DATA_DIR=/projects/standard/basu_hbcd/shared/data
 : "${HBCD_RELEASE:=br_21p3}"
