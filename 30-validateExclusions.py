@@ -8,6 +8,7 @@
 import sys
 from pathlib import Path
 import pandas as pd
+from datetime import datetime
 from _lib import DATA_DIR, get_release_dir, load_additional_excluded_pscids
 
 TOTAL_WIDTH = 67
@@ -22,6 +23,23 @@ release_base = RELEASE_DIR.parent
 gda_dir = RELEASE_DIR / "GDA"
 genesis_dir = RELEASE_DIR / "genesis"
 cnv_dir = RELEASE_DIR / "cnv"
+
+# ── tee stdout to log file ──────────────────────────────────────────────
+class _Tee:
+    def __init__(self, path):
+        self.file = open(path, "w", buffering=1)
+    def write(self, data):
+        sys.__stdout__.write(data)
+        self.file.write(data)
+    def flush(self):
+        sys.__stdout__.flush()
+        self.file.flush()
+
+release_base.mkdir(parents=True, exist_ok=True)
+_log_path = release_base / f"log_30_validateExclusions_{datetime.now():%Y%m%d_%H%M%S}.txt"
+_tee = _Tee(_log_path)
+sys.stdout = _tee
+print(f"Log: {_log_path}")
 
 
 def _sep(title=""):
@@ -303,15 +321,13 @@ _check_file(
 
 _sep("Cross-form subject count consistency")
 
-def _unique_rc_from(path, id_col, sep="\t"):
+def _unique_iids_from(path, id_col, sep="\t"):
     if not path.exists():
         return set()
     df = pd.read_csv(path, sep=sep, dtype=str)
-    iids = df[id_col].dropna().astype(str)
-    return set(i[:-1] for i in iids)
+    return set(df[id_col].dropna().astype(str))
 
-fam_rc_set = fam_rc if fam_path.exists() else set()
-release_rc = set(i[:-1] for i in release_iids) if release_iids else set()
+fam_iids_set = fam_iids if fam_path.exists() else set()
 
 derivatives = []
 if genesis_dir.exists():
@@ -328,38 +344,38 @@ for label, path in derivatives:
     if ".grm.id" in path.name:
         df = pd.read_csv(path, sep=r"\s+", header=None, dtype=str)
         ids = set(df[1].dropna().astype(str))
-        rc_set = set(i[:-1] for i in ids)
+        iid_set = set(ids)
     elif path.name == "CNV_slim.txt":
-        rc_set = _unique_rc_from(path, "sample_id", sep="\t")
+        iid_set = _unique_iids_from(path, "sample_id", sep="\t")
     elif path.name == "HBCD_CNV_bookmark_metrics_clean.csv":
-        rc_set = _unique_rc_from(path, "sample_id", sep=",")
+        iid_set = _unique_iids_from(path, "sample_id", sep=",")
     elif path.name.endswith(".tsv"):
         df = pd.read_csv(path, sep="\t", dtype=str)
         ids = set()
         for col in df.columns:
             if col in ("ID1", "ID2", "subject_id"):
                 ids.update(df[col].dropna().astype(str))
-        rc_set = set(i[:-1] for i in ids)
+        iid_set = set(ids)
     elif path.name.endswith(".id"):
         df = pd.read_csv(path, sep=r"\s+", header=None, dtype=str)
         ids = set(df[1].dropna().astype(str))
-        rc_set = set(i[:-1] for i in ids)
+        iid_set = set(ids)
     else:
         continue
 
-    n = len(rc_set)
-    match_fam = "✓" if rc_set == fam_rc_set else ("DIFF" if fam_rc_set else "?")
-    match_release = "✓" if rc_set == release_rc else ("DIFF" if release_rc else "?")
+    n = len(iid_set)
+    match_fam = "✓" if iid_set == fam_iids_set else ("DIFF" if fam_iids_set else "?")
+    match_release = "✓" if iid_set == release_iids else ("DIFF" if release_iids else "?")
     print(f"  [{match_fam}/{match_release}]  {label}")
-    print(f"           unique subjects: {n:>6}")
-    if fam_rc_set:
-        missing_in_fam = rc_set - fam_rc_set
-        extra_in_fam = fam_rc_set - rc_set
+    print(f"           unique IIDs     : {n:>6}")
+    if fam_iids_set:
+        missing_in_fam = iid_set - fam_iids_set
+        extra_in_fam = fam_iids_set - iid_set
         if missing_in_fam:
-            print(f"           subjects NOT in fam: {len(missing_in_fam):>6}  "
+            print(f"           IIDs NOT in fam : {len(missing_in_fam):>6}  "
                   f"e.g. {sorted(missing_in_fam)[:5]}")
         if extra_in_fam:
-            print(f"           subjects in fam NOT in file: {len(extra_in_fam):>6}  "
+            print(f"           IIDs in fam NOT in file: {len(extra_in_fam):>6}  "
                   f"e.g. {sorted(extra_in_fam)[:5]}")
 
 
@@ -369,9 +385,9 @@ for label, path in derivatives:
 
 _sep()
 print("Validation complete.")
-n_fam = len(fam_rc) if fam_path.exists() else 0
-print(f"  Release RC (merged_chroms.fam): {n_fam}")
-print(f"  Release IIDs (keep_list.txt)  : {len(release_iids)}")
-print(f"  Excluded pscids               : {len(excluded_pscids)}")
-print(f"  Excluded RC                   : {len(exc_rc)}")
-print(f"  Excluded IIDs                 : {len(exc_iids)}")
+n_fam = len(fam_iids) if fam_path.exists() else 0
+print(f"  Release IIDs (merged_chroms.fam): {n_fam}")
+print(f"  Release IIDs (keep_list.txt)    : {len(release_iids)}")
+print(f"  Excluded pscids                 : {len(excluded_pscids)}")
+print(f"  Excluded RC                     : {len(exc_rc)}")
+print(f"  Excluded IIDs                   : {len(exc_iids)}")
