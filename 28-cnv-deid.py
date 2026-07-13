@@ -52,7 +52,7 @@ cnv["release_candid"] = cnv["release_candid"].astype(int)
 # ── build de-identified IID ────────────────────────────────────────────
 cnv["sample_id"] = cnv["release_candid"].astype(str) + cnv["type"]
 cnv = cnv.drop(columns=["type", "_pscid_orig", "release_candid"])
-cnv_unique = cnv["sample_id"].str[:-1].unique()
+cnv_unique = cnv["sample_id"].unique()
 cnv_n_subjects = len(cnv_unique)
 print(f"  De-identified rows: {len(cnv)}, unique subjects: {cnv_n_subjects}")
 
@@ -74,7 +74,7 @@ if not BM_INPUT.exists():
 else:
     import shutil
     bm_src = pd.read_csv(BM_INPUT, sep=",", dtype=str)
-    bm_unique = bm_src["sample_id"].str[:-1].unique()
+    bm_unique = bm_src["sample_id"].unique()
     bm_n_subjects = len(bm_unique)
     CNV_DEID_DIR.mkdir(parents=True, exist_ok=True)
     shutil.copy2(BM_INPUT, BM_DEID_OUT)
