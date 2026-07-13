@@ -327,8 +327,6 @@ def _unique_iids_from(path, id_col, sep="\t"):
     df = pd.read_csv(path, sep=sep, dtype=str)
     return set(df[id_col].dropna().astype(str))
 
-fam_iids_set = fam_iids if fam_path.exists() else set()
-
 derivatives = []
 if genesis_dir.exists():
     for f in genesis_dir.glob("*"):
@@ -364,20 +362,9 @@ for label, path in derivatives:
         continue
 
     n = len(iid_set)
-    match_fam = "✓" if iid_set == fam_iids_set else ("DIFF" if fam_iids_set else "?")
     match_release = "✓" if iid_set == release_iids else ("DIFF" if release_iids else "?")
-    print(f"  [{match_fam}/{match_release}]  {label}")
+    print(f"  [{match_release}]  {label}")
     print(f"           unique IIDs     : {n:>6}")
-    if fam_iids_set:
-        missing_in_fam = iid_set - fam_iids_set
-        extra_in_fam = fam_iids_set - iid_set
-        if missing_in_fam:
-            print(f"           IIDs NOT in fam : {len(missing_in_fam):>6}  "
-                  f"e.g. {sorted(missing_in_fam)[:5]}")
-        if extra_in_fam:
-            print(f"           IIDs in fam NOT in file: {len(extra_in_fam):>6}  "
-                  f"e.g. {sorted(extra_in_fam)[:5]}")
-
 
 # ══════════════════════════════════════════════════════════════════════════
 # Summary
