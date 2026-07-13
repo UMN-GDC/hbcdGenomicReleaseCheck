@@ -242,17 +242,15 @@ def _unique_iids_from(path, id_col, sep="\t"):
 cnv_iids = _unique_iids_from(cnv_dir / "CNV_slim.txt", "sample_id", sep="\t")
 bm_iids = _unique_iids_from(cnv_dir / "HBCD_CNV_bookmark_metrics_clean.csv", "sample_id", sep=",")
 
-rc_cnv = set(i[:-1] for i in cnv_iids)
-print(f"  CNV_slim.txt unique subjects        : {len(rc_cnv):>6}")
-rc_bm = set(i[:-1] for i in bm_iids)
-print(f"  Bookmarks unique subjects           : {len(rc_bm):>6}")
+print(f"  CNV_slim.txt unique IIDs            : {len(cnv_iids):>6}")
+print(f"  Bookmarks unique IIDs               : {len(bm_iids):>6}")
 
-common = rc_cnv & rc_bm
-only_cnv = rc_cnv - rc_bm
-only_bm = rc_bm - rc_cnv
-print(f"  Subjects in BOTH CNV+Bookmarks     : {len(common):>6}")
-print(f"  Subjects ONLY in CNV               : {len(only_cnv):>6}")
-print(f"  Subjects ONLY in Bookmarks          : {len(only_bm):>6}")
+common = cnv_iids & bm_iids
+only_cnv = cnv_iids - bm_iids
+only_bm = bm_iids - cnv_iids
+print(f"  IIDs in BOTH CNV+Bookmarks         : {len(common):>6}")
+print(f"  IIDs ONLY in CNV                   : {len(only_cnv):>6}")
+print(f"  IIDs ONLY in Bookmarks              : {len(only_bm):>6}")
 
 print(f"\nReference release_iids (keep_list.txt): {len(release_iids):>6}")
 missing_from_release = cnv_iids - release_iids
