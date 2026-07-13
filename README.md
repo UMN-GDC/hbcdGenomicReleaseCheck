@@ -16,7 +16,7 @@ python 25-filterGenotypeFiles.py
 # Step 26 — PLINK2 --keep to produce release bed/bim/fam:
 bash 26-run_plink_filter.sh
 
-# Step 27 — Filter imputed VCFs:
+# Step 27 — Filter + de-identify imputed VCFs:
 sbatch 27-filter_imputed_vcf.SLURM
 
 # Step 28 — CNV de-identification only (pscid → release_candid):
@@ -41,8 +41,6 @@ The same pattern applies to any new derivative: **de-ID first** (map pscid →
 release_candid in `data_handoff/`), **then filter** (keep only release IIDs).
 
 ---
-
-## Full pipeline
 
 ## Full pipeline
 
@@ -97,7 +95,7 @@ file that was never de-identified (CNV).
 |   |--------|----------------|-------|--------|
 | 25 | `filterGenotypeFiles.py` | **De-ID + Filter** | de-IDed `onlyQc.{bed,bim,fam}`, identifiers, exclusions | `keep_list.txt`, `temp.fam`, `GDA/batch.info`, `GDA/removed_individuals.txt` |
 | 26 | `run_plink_filter.sh` | Filter | `onlyQc`, `temp.fam`, `keep_list.txt` | `GDA/merged_chroms.{bed,bim,fam}` |
-| 27 | `filter_imputed_vcf.SLURM` | Filter | imputed VCFs (c1/c2/c3/cX), `keep_list.txt` | filtered `imputed/chr*_dose.vcf.gz` |
+| 27 | `filter_imputed_vcf.SLURM` | **De-ID + Filter** | imputed VCFs (c1/c2/c3/cX), identifiers, `keep_list.txt` | filtered + de-IDed `imputed/chr*_dose.vcf.gz` |
 | 28 | `cnv-deid.py` | **De-ID** | `data_handoff/CNV_slim_clean.txt`, identifiers; `data_handoff/HBCD_CNV_bookmark_metrics_clean.csv` (copied as-is) | de-IDed `cnv/CNV_slim_deid.txt`, copied `cnv/HBCD_CNV_bookmark_metrics_clean_deid.csv` |
 | 29 | `filter_release_outputs.py` | Filter | de-IDed handoff files (GRM, PCs, CNV, bookmarks), `keep_list.txt` | filtered genesis/ + cnv/ files |
 | 30 | `validateExclusions.py` | — | all release output files | console validation report |
@@ -205,13 +203,25 @@ plink2 --bfile onlyQc \
 
 ---
 
-## Phase C, step 27: Filter imputed VCFs
+## Phase C, step 27: Filter + de-identify imputed VCFs
 
 Runs as a SLURM array (24 tasks, one per chromosome).  For each chromosome
-1–22 + X, finds the imputed VCF in one of the chunk directories (c1/c2/c3/cX),
-uses `bcftools view --samples-file` with the release IID whitelist to subset
-samples, and writes a filtered VCF + tabix index to `release/data/imputed/`.
-Also copies the corresponding `.info.gz` file alongside.
+1–22 + X, finds the imputed VCF in one of the chunk directories (c1/c2/c3/cX).
+
+Source VCFs have pscid-based sample IDs (`ABCDE1234C`).  This step maps them
+to de-identified IIDs (`{release_candid}{C|M}`) via the identifiers crosswalk:
+
+1. Extracts VCF sample names with `bcftools query -l`
+2. Builds a rename mapping: for each VCF sample, strips the last character
+   (C/M), looks up `pscid` → `release_candid`, constructs the de-identified IID
+3. Filters to release subjects (only IIDs in `keep_list.txt`)
+4. `bcftools view --samples-file` keeps matching subjects by original name
+5. `bcftools reheader --samples` renames to de-identified IIDs
+6. Writes filtered + de-identified VCF + tabix index + copies `.info.gz`
+
+**Important:** filtering uses the VCF's *original* sample IDs (pscid-based),
+not the de-identified IDs.  The rename happens after filtering in a separate
+`bcftools reheader` step.
 
 ```bash
 sbatch 27-filter_imputed_vcf.SLURM
@@ -327,7 +337,7 @@ python 25-filterGenotypeFiles.py
 # 2. PLINK2 --keep → GDA/merged_chroms
 ./26-run_plink_filter.sh
 
-# 3. Filter imputed VCFs (SLURM array, 24 tasks — chromosomes 1–22 + X)
+# 3. Filter + de-identify imputed VCFs (SLURM array, 24 tasks — chromosomes 1–22 + X)
 sbatch 27-filter_imputed_vcf.SLURM
 
 # 4. De-identify CNV (the one file that still has raw pscids)
@@ -363,7 +373,7 @@ python 25-filterGenotypeFiles.py
 ./26-run_plink_filter.sh
 
 # 3–5. Re-filter everything (independent of each other)
-sbatch 27-filter_imputed_vcf.SLURM          # VCFs
+sbatch 27-filter_imputed_vcf.SLURM          # VCFs (de-id + filter)
 python 28-cnv-deid.py                        # CNV de-ID (pscid → release_candid)
 python 29-filter_release_outputs.py          # filter all derivatives + CNV
 
@@ -408,6 +418,10 @@ IID checks for release derivative outputs:
 | `test_pcrelate_grm_pairwise_ids_are_release` | All ID1/ID2 in genesis/pcrelate_relatedness.tsv are release |
 | `test_cnv_slim_clean_ids_are_release` | All sample_ids in cnv/CNV_slim.txt are release |
 | `test_cnv_bookmark_ids_are_release` | All sample_ids in cnv/HBCD_CNV_bookmark_metrics_clean.csv are release |
+| `test_imputed_vcf_sample_ids_deidentified` | All imputed VCF sample IDs match `^\d{10}[CM]$` |
+| `test_imputed_vcf_subject_count_matches_release` | Per-chromosome sample count = release total |
+| `test_imputed_vcf_subject_set_matches_release` | IID set matches release IIDs (no missing/extra) |
+| `test_imputed_vcf_genotype_concordance` | 3 subjects × 5 chr22 PLINK/VCF genotypes match (catches shuffling) |
 
 ### `tests/test_exclusions.py` — 4 tests
 
