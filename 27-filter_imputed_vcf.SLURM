@@ -19,18 +19,18 @@ set -euo pipefail
 module load bcftools
 
 source ~/miniconda3/etc/profile.d/conda.sh
-conda activate base
-source ../.venv/bin/activate
+conda activate python
 
-DATA_DIR=/projects/standard/basu_hbcd/shared/data
+DATA_DIR=/home/ood-coffm049/hbcdData
+IMPDIR="${DATA_DIR}/imputed"
 : "${HBCD_RELEASE:=br_21p3}"
-: "${RELEASE_BASE:=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_${HBCD_RELEASE}}"
+: "${RELEASE_BASE:=${DATA_DIR}/HBCD_genomics_release_${HBCD_RELEASE}}"
 
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
 chr="${CHROMS[$SLURM_ARRAY_TASK_ID]}"
 
 KEEP_LIST="${RELEASE_BASE}/keep_list.txt"
-IMPUTED_DIRS=("${DATA_DIR}/imputed/c1" "${DATA_DIR}/imputed/c2" "${DATA_DIR}/imputed/c3" "${DATA_DIR}/imputed/cX")
+IMPUTED_DIRS=("${IMPDIR}/c1" "${IMPDIR}/c2" "${IMPDIR}/c3")
 OUTDIR="${RELEASE_BASE}/genotype_microarray/imputed"
 
 mkdir -p "$OUTDIR" logs
