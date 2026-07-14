@@ -113,6 +113,9 @@ print(f"  Skip — unmapped pscid   : {n_skip_no_rc}")
 print(f"  Skip — not in release   : {n_skip_not_release}")
 PYEOF
 
+# Extract VCF sample names first
+bcftools query -l "$VCF_FILE" > "${OUTDIR}/vcf_samples_${chr}.txt"
+
 python3 "${OUTDIR}/.build_mapping_${chr}.py" \
     "$DATA_DIR" "$KEEP_LIST" "$OUTDIR" "$chr"
 
