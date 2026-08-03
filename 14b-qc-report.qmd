@@ -8,6 +8,7 @@ format:
 
 ```{python}
 #| label: setup
+import os
 import re
 import base64
 from pathlib import Path
@@ -16,7 +17,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from IPython.display import display, HTML
 
-IMPUTED_DIR = Path("/home/ood-coffm049/hbcdData/imputed")
+IMPUTED_DIR = Path(
+    os.environ.get("HBCD_IMPUTATION_DIR", "/projects/standard/basu_hbcd/shared/hbcdSandboxData")
+) / "imputed"
 CHUNKS = ["c1", "c2", "c3"]
 
 # ── parsers ─────────────────────────────────────────────────────────────

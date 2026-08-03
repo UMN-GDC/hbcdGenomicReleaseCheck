@@ -12,8 +12,10 @@
 
 set -euo pipefail
 
-CACHE_DIR="gp_cache"
-IMPUTED_DIRS=("imputed/c1" "imputed/c2" "imputed/c3" "imputed/cX")
+IMPUTATION_DIR="${HBCD_IMPUTATION_DIR:-/projects/standard/basu_hbcd/shared/hbcdSandboxData}"
+CACHE_DIR="${IMPUTATION_DIR}/imputed/gp_cache"
+IMPDIR="${IMPUTATION_DIR}/imputed"
+IMPUTED_DIRS=("${IMPDIR}/c1" "${IMPDIR}/c2" "${IMPDIR}/c3")
 
 echo "--- Aggregating per-chromosome RDS files from $CACHE_DIR ---"
 
@@ -80,7 +82,9 @@ if (nrow(cr) > 0) {
 write_csv(call_rate_all, file.path("'"$CACHE_DIR"'", "call_rate_by_ancestry.csv.gz"))
 cat("Call-rate entries:", nrow(call_rate_all), "\n")
 
-imputed_dirs <- c("imputed/c1", "imputed/c2", "imputed/c3", "imputed/cX")
+imputed_dirs <- c(file.path("'"$IMPUTATION_DIR"'", "imputed", "c1"),
+                  file.path("'"$IMPUTATION_DIR"'", "imputed", "c2"),
+                  file.path("'"$IMPUTATION_DIR"'", "imputed", "c3"))
 info_gz_files <- list.files(imputed_dirs, pattern = "\\.info\\.gz$", recursive = TRUE, full.names = TRUE)
 if (length(info_gz_files) > 0) {
   yield <- map_dfr(info_gz_files, ~{

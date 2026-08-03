@@ -13,10 +13,11 @@ library(data.table)
 library(glue)
 library(ggridges)
 
-cache_dir <- "gp_cache"
+imputation_dir <- Sys.getenv("HBCD_IMPUTATION_DIR", "/projects/standard/basu_hbcd/shared/hbcdSandboxData")
+cache_dir <- file.path(imputation_dir, "imputed", "gp_cache")
 dir.create(cache_dir, showWarnings = FALSE, recursive = TRUE)
 
-imputed_dirs <- c("imputed/c1", "imputed/c2", "imputed/c3", "imputed/cX")
+imputed_dirs <- file.path(imputation_dir, c("imputed/c1", "imputed/c2", "imputed/c3"))
 ```
 
 ## Data Discovery
@@ -228,7 +229,8 @@ all_data %>%
 ## Imputation Yield
 
 ```{r imputation-yield, cache=TRUE}
-pvar_files <- list.files("data", pattern = "^temp_raw_chr.*\\.pvar$", full.names = TRUE)
+pvar_files <- list.files(file.path(imputation_dir, "data"),
+                         pattern = "^temp_raw_chr.*\\.pvar$", full.names = TRUE)
 pre_counts <- tibble()
 if (length(pvar_files) > 0) {
   pre_counts <- map_dfr(pvar_files, ~{

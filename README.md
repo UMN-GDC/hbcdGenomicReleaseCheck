@@ -45,7 +45,9 @@ release_candid in `data_handoff/`), **then filter** (keep only release IIDs).
 ## Full pipeline
 
 The pipeline has three phases.  All data sources live in
-`/projects/standard/basu_hbcd/shared/data/` unless noted otherwise.
+`/projects/standard/basu_hbcd/shared/data/` unless noted otherwise.  Imputation
+inputs (source VCFs, GP cache, staging `data/`) live under `$HBCD_IMPUTATION_DIR`
+(default `/projects/standard/basu_hbcd/shared/hbcdSandboxData`).
 
 ### Phase A — QC & derivative computation (scripts 01–16)
 
@@ -59,7 +61,7 @@ executed once to produce the `onlyQc` dataset and all downstream derivatives.
 | **03–04** | **GRM computation** — genetic relatedness matrix via GCTA (`hbcd_gcta_grm.*`) and PLINK (`hbcd_plink_grm.rel.*`). |
 | **05–06** | **PC-AiR** — ancestry-adjusted principal components on unrelated subjects using KING kinship.  Outputs: `hbcd_rsid_harmonized_pc_scores.txt`, PC-AiR RDS object, unrelated/related ID lists. |
 | **07–09** | **PC-Relate** — pairwise relatedness estimation using GENESIS.  Outputs include IBD probabilities (`pcrelate_pairs`, `pcrelate_ibd`, `pcrelate_self`), kinship matrices (`kinmat_wide`, `kinmat_long`), and PC-AiR score export CSV/TSV. |
-| **10–13** | **Imputation prep & submission** — prepares chromosomes 1–22 + X for the TOPMed imputation server, submits, downloads result chunks (c1/c2/c3/cX), and unzips. |
+| **10–13** | **Imputation prep & submission** — prepares chromosomes 1–22 + X for the TOPMed imputation server, submits, downloads result chunks (c1/c2/c3), and unzips. |
 | **14** | **GP precomputation** — per-chromosome × per-ancestry group genetic-probability extraction from imputed VCFs (low-MAF variants only), split by ancestry with ancestry-appropriate race codes (WHT, BLK, AIAN, ASN, HPI, 2PLUS, OTH, UNK). |
 | **15** | **GP aggregation** — combines per-chromosome GP results into final CSV files. |
 | **16** | **Imputation QC report** — Quarto report with per-chunk SNP metrics, excluded-SNP breakdowns, typed-SNP chromosome counts, and embedded interactive quality control. |
@@ -95,7 +97,7 @@ file that was never de-identified (CNV).
 |   |--------|----------------|-------|--------|
 | 25 | `filterGenotypeFiles.py` | **De-ID + Filter** | de-IDed `onlyQc.{bed,bim,fam}`, identifiers, exclusions | `keep_list.txt`, `temp.fam`, `GDA/batch.info`, `GDA/removed_individuals.txt` |
 | 26 | `run_plink_filter.sh` | Filter | `onlyQc`, `temp.fam`, `keep_list.txt` | `GDA/merged_chroms.{bed,bim,fam}` |
-| 27 | `filter_imputed_vcf.SLURM` | **De-ID + Filter** | imputed VCFs (c1/c2/c3/cX), identifiers, `keep_list.txt` | filtered + de-IDed `imputed/chr*_dose.vcf.gz` |
+| 27 | `filter_imputed_vcf.SLURM` | Filter | imputed VCFs (c1/c2/c3), `keep_list.txt` | filtered `imputed/chr*_dose.vcf.gz` |
 | 28 | `cnv-deid.py` | **De-ID** | `data_handoff/CNV_slim_clean.txt`, identifiers; `data_handoff/HBCD_CNV_bookmark_metrics_clean.csv` (copied as-is) | de-IDed `cnv/CNV_slim_deid.txt`, copied `cnv/HBCD_CNV_bookmark_metrics_clean_deid.csv` |
 | 29 | `filter_release_outputs.py` | Filter | de-IDed handoff files (GRM, PCs, CNV, bookmarks), `keep_list.txt` | filtered genesis/ + cnv/ files |
 | 30 | `validateExclusions.py` | — | all release output files | console validation report |
@@ -105,8 +107,11 @@ file that was never de-identified (CNV).
 All output goes to a release-specific directory — originals are never
 modified.  Set the release tag via `HBCD_RELEASE` (default `br_21p3`):
 
-```
+```bash
 export HBCD_RELEASE=br_21p3
+
+# Imputation input data root (imputed/ + data/ staging):
+export HBCD_IMPUTATION_DIR=/projects/standard/basu_hbcd/shared/hbcdSandboxData
 
 # Output root:
 #   /projects/standard/basu_hbcd/shared/HBCD_genomics_release_br_21p3/
@@ -203,25 +208,21 @@ plink2 --bfile onlyQc \
 
 ---
 
-## Phase C, step 27: Filter + de-identify imputed VCFs
+## Phase C, step 27: Filter imputed VCFs to release subjects
 
 Runs as a SLURM array (24 tasks, one per chromosome).  For each chromosome
-1–22 + X, finds the imputed VCF in one of the chunk directories (c1/c2/c3/cX).
+1–22 + X, finds the imputed VCF in one of the chunk directories under
+`$HBCD_IMPUTATION_DIR/imputed` (default `…/hbcdSandboxData/imputed`), chunks
+c1/c2/c3.
 
-Source VCFs have pscid-based sample IDs (`ABCDE1234C`).  This step maps them
-to de-identified IIDs (`{release_candid}{C|M}`) via the identifiers crosswalk:
+Source VCF sample IDs are already de-identified (`{release_candid}{C|M}`, e.g.
+`1234567890C`), so no rename is needed — the step only keeps release subjects:
 
 1. Extracts VCF sample names with `bcftools query -l`
-2. Builds a rename mapping: for each VCF sample, strips the last character
-   (C/M), looks up `pscid` → `release_candid`, constructs the de-identified IID
-3. Filters to release subjects (only IIDs in `keep_list.txt`)
-4. `bcftools view --samples-file` keeps matching subjects by original name
-5. `bcftools reheader --samples` renames to de-identified IIDs
-6. Writes filtered + de-identified VCF + tabix index + copies `.info.gz`
-
-**Important:** filtering uses the VCF's *original* sample IDs (pscid-based),
-not the de-identified IDs.  The rename happens after filtering in a separate
-`bcftools reheader` step.
+2. Intersects them with the release IID set from `keep_list.txt`
+3. Writes the keep-list intersection (`keep_old_<chr>.txt`)
+4. `bcftools view --samples-file` keeps matching subjects
+5. Writes `chr<chr>_dose.vcf.gz` + tabix index + copies `.info.gz`
 
 ```bash
 sbatch 27-filter_imputed_vcf.SLURM

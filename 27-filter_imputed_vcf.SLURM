@@ -7,12 +7,14 @@
 #SBATCH --output=logs/filter_vcf_%A_%a.out
 #SBATCH --error=logs/filter_vcf_%A_%a.err
 
-# step 27: filter imputed VCFs to release subjects and de-identify sample IDs
+# step 27: filter imputed VCFs to release subjects (samples already de-identified)
 # VCF sample IDs are already release_candid-based (10-digit + C/M); just filter to release.
 # Run AFTER steps 25-26 (keep_list.txt exists).
 #
-# Env: HBCD_RELEASE  — release tag (default: br_21p3)
-#       RELEASE_BASE — override release base dir (default: derived)
+# Env: HBCD_RELEASE         — release tag (default: br_21p3)
+#       HBCD_DATA_DIR        — source data dir (default: shared/data)
+#       HBCD_IMPUTATION_DIR  — imputation data root (default: shared/hbcdSandboxData)
+#       RELEASE_BASE         — override release base dir (default: derived from DATA_DIR)
 
 set -euo pipefail
 
@@ -21,10 +23,11 @@ module load bcftools
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate python
 
-DATA_DIR=/home/ood-coffm049/hbcdData
-IMPDIR="${DATA_DIR}/imputed"
+DATA_DIR="${HBCD_DATA_DIR:-/projects/standard/basu_hbcd/shared/data}"
 : "${HBCD_RELEASE:=br_21p3}"
-: "${RELEASE_BASE:=${DATA_DIR}/HBCD_genomics_release_${HBCD_RELEASE}}"
+IMPUTATION_DIR="${HBCD_IMPUTATION_DIR:-/projects/standard/basu_hbcd/shared/hbcdSandboxData}"
+IMPDIR="${IMPUTATION_DIR}/imputed"
+: "${RELEASE_BASE:=$(dirname "$DATA_DIR")/HBCD_genomics_release_${HBCD_RELEASE}}"
 
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
 chr="${CHROMS[$SLURM_ARRAY_TASK_ID]}"

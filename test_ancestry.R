@@ -1,6 +1,9 @@
 library(tidyverse, quietly = TRUE)
 
-CACHE_DIR <- "/home/ood-coffm049/hbcdData/imputed/gp_cache"
+CACHE_DIR <- file.path(
+    Sys.getenv("HBCD_IMPUTATION_DIR", "/projects/standard/basu_hbcd/shared/hbcdSandboxData"),
+    "imputed", "gp_cache"
+)
 ANCESTRY_FILE <- "/shared/release/hbcd/hbcd/rawdata/phenotype/sed_basic_demographics.tsv"
 
 # ── Read typed sample list ──────────────────────────────────────────────
