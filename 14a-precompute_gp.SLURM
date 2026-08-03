@@ -30,8 +30,9 @@ module unload bcftools 2>/dev/null || true   # no-op guard: ensure a clean re-lo
 module load bcftools
 
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
-IMPDIR="${HBCD_IMPUTATION_DIR:-/projects/standard/basu_hbcd/shared/hbcdSandboxData}/imputed"
-ANCESTRY_FILE="/shared/release/hbcd/hbcd/rawdata/phenotype/sed_basic_demographics.tsv"
+IMPUTATION_ROOT="${HBCD_IMPUTATION_DIR:-/projects/standard/basu_hbcd/shared/hbcdSandboxData}"
+IMPDIR="${IMPUTATION_ROOT}/imputed"
+ANCESTRY_FILE="${IMPUTATION_ROOT}/sed_basic_demographics.tsv"
 # sed_basic_demographics_child_race: 0=White, 1=Black, 2=AIAN, 3=Asian,
 #                                     4=Hawaiian/PI, 5=Two+, 6=Other, 7=Unknown
 IMPUTED_DIRS=($IMPDIR/c1 $IMPDIR/c2 $IMPDIR/c3)
