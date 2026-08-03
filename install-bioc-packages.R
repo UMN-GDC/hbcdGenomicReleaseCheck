@@ -2,7 +2,7 @@
 # Install R packages for the HBCD release pipeline.
 #
 # Two usage modes:
-#   1) Conda-based:  conda activate hbcd-release && Rscript install-bioc-packages.R
+#   1) Conda-based:  conda activate gdcPipeline && Rscript install-bioc-packages.R
 #   2) HPC-module:   module load R/4.4.2-openblas-rocky8 && Rscript install-bioc-packages.R
 #
 # Packages are installed to the personal/site R library.

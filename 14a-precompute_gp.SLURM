@@ -24,7 +24,7 @@ set -euo pipefail
 module load bcftools
 
 source ~/miniconda3/etc/profile.d/conda.sh
-conda activate python  # default for Python (main pipeline)
+conda activate gdcPipeline  # shared env: python + R (tidyverse)
 
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
 IMPDIR="${HBCD_IMPUTATION_DIR:-/projects/standard/basu_hbcd/shared/hbcdSandboxData}/imputed"
@@ -111,7 +111,7 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
           print tolower(clean), type}' "$CACHE_DIR/sample_order.txt" \
         > "$CACHE_DIR/sample_order_typed.txt"
 
-    conda run -n R Rscript --vanilla -e '
+    conda run -n gdcPipeline Rscript --vanilla -e '
         library(tidyverse, quietly = TRUE)
         si <- read_table("'"$CACHE_DIR/sample_order_typed.txt"'",
                          col_names = c("sid", "type"), col_types = "cc")
@@ -200,7 +200,7 @@ OUT_RDS="$CACHE_DIR/chr${chr}${ANC:+_$ANC}.rds"
 
 if [ "$n_low_maf" -eq 0 ]; then
     echo "  No low-MAF variants, saving empty RDS"
-    conda run -n R Rscript --vanilla -e '
+    conda run -n gdcPipeline Rscript --vanilla -e '
         saveRDS(list(sums = NULL, hist_bins = NULL, ridge = NULL, call_rate = NULL),
                 file = "'"$OUT_RDS"'")
     '
@@ -223,7 +223,7 @@ bcftools view -i 'MAF>0 && MAF<0.05' "${BC_ARGS[@]}" "$VCF_FILE" -Ou 2>/dev/null
         --outdir "$TMPDIR"
 
 # ── Assemble RDS ─────────────────────────────────────────────────────
-conda run -n R Rscript --vanilla -e '
+conda run -n gdcPipeline Rscript --vanilla -e '
     library(tidyverse, quietly = TRUE)
     td <- "'"$TMPDIR"'"
     per_sample <- tryCatch(
@@ -248,7 +248,7 @@ conda run -n R Rscript --vanilla -e '
 
 # ── Save INFO stats ──────────────────────────────────────────────────
 if [ -n "$INFO_FILE" ]; then
-    conda run -n R Rscript --vanilla -e '
+    conda run -n gdcPipeline Rscript --vanilla -e '
         library(tidyverse, quietly = TRUE)
         info <- read_tsv("'"$INFO_FILE"'", show_col_types = FALSE)
         if ("Rsq" %in% names(info) && "MAF" %in% names(info)) {

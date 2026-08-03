@@ -111,7 +111,7 @@ Outputs use raw pscid IDs and are **not** de-identified yet.
 ```bash
 # ── 0. Environment ──────────────────────────────────────────────────
 source ~/miniconda3/etc/profile.d/conda.sh
-conda activate python               # Python steps
+conda activate gdcPipeline          # shared env: python + R (tidyverse)
 module load plink/2.00-alpha-091019
 module load bcftools
 module load R/4.4.2-openblas-rocky8 # R / GENESIS steps
@@ -315,7 +315,7 @@ are already in de-identified format (`{release_candid}{C|M}`, e.g. `2910626018M`
 Copied as-is to `staging/cnv/CNV_bookmarks_deid.csv` (no de-ID needed).
 
 ```bash
-conda run -n python python 28-cnv-deid.py
+conda run -n gdcPipeline python 28-cnv-deid.py
 ```
 
 ---
@@ -340,7 +340,7 @@ Filtering methods per file type (outputs → `genesis/` or `cnv/`):
 | `cnv/CNV_bookmarks.csv` | `sample_id` | inline filter |
 
 ```bash
-conda run -n python python 29-filter_release_outputs.py
+conda run -n gdcPipeline python 29-filter_release_outputs.py
 ```
 
 ---
@@ -377,7 +377,7 @@ and checks for contamination by excluded subjects:
   nor the exclusion set (catches unexpected subjects)
 
 ```bash
-conda run -n python python 30-validateExclusions.py
+conda run -n gdcPipeline python 30-validateExclusions.py
 ```
 
 ---
@@ -392,7 +392,7 @@ and the test suite are the final quality gate.
 ```bash
 # ── 0. Environment ──────────────────────────────────────────────────
 source ~/miniconda3/etc/profile.d/conda.sh
-conda activate python
+conda activate gdcPipeline
 module load plink/2.00-alpha-091019   # step 26
 module load bcftools                  # step 27
 
@@ -507,7 +507,7 @@ IID checks for release derivative outputs:
 | `test_removed_individuals_absent` | No GDA/removed_individuals.txt IID leaks |
 
 ```bash
-conda run -n python python -m pytest tests/ -v
+conda run -n gdcPipeline python -m pytest tests/ -v
 ```
 
 ---
@@ -518,4 +518,4 @@ conda run -n python python -m pytest tests/ -v
 - PLINK 2.00 (alpha) — `module load plink/2.00-alpha-091019`
 - bcftools — `module load bcftools`
 - R ≥ 4.3 with `tidyverse`, `ggh4x`, `zoo`, `scales` for `.qmd` reports
-- Conda environments: `python` (Python tools), `gdcPipeline` (R tools)
+- Conda environment: `gdcPipeline` (Python + R tools; pandas, numpy, openpyxl, pytest, matplotlib, tidyverse, ggh4x, zoo, scales)

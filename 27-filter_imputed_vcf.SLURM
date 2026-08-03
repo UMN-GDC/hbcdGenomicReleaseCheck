@@ -21,7 +21,7 @@ set -euo pipefail
 module load bcftools
 
 source ~/miniconda3/etc/profile.d/conda.sh
-conda activate python
+conda activate gdcPipeline
 
 DATA_DIR="${HBCD_DATA_DIR:-/projects/standard/basu_hbcd/shared/data}"
 : "${HBCD_RELEASE:=br_21p3}"
