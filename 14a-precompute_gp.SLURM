@@ -24,7 +24,9 @@ set -euo pipefail
 module load bcftools
 
 source ~/miniconda3/etc/profile.d/conda.sh
+set +u                              # conda activate.d scripts touch unbound vars
 conda activate gdcPipeline  # shared env: python + R (tidyverse)
+set -u                              # restore strictness
 
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
 IMPDIR="${HBCD_IMPUTATION_DIR:-/projects/standard/basu_hbcd/shared/hbcdSandboxData}/imputed"

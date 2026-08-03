@@ -21,7 +21,9 @@ set -euo pipefail
 module load bcftools
 
 source ~/miniconda3/etc/profile.d/conda.sh
+set +u                              # conda activate.d scripts touch unbound vars
 conda activate gdcPipeline
+set -u                              # restore strictness
 
 DATA_DIR="${HBCD_DATA_DIR:-/projects/standard/basu_hbcd/shared/data}"
 : "${HBCD_RELEASE:=br_21p3}"
