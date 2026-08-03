@@ -3,7 +3,9 @@
 Set ``HBCD_RELEASE`` env var to test against a different release.
 """
 import re
+import os
 import subprocess
+import collections
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -516,15 +518,15 @@ def test_cnv_slim_clean_ids_are_release():
 
 
 def test_cnv_bookmark_ids_are_release():
-    """All sample_id in cnv/HBCD_CNV_bookmark_metrics_clean.csv are release IIDs."""
-    p = CNV_DIR / "HBCD_CNV_bookmark_metrics_clean.csv"
+    """All sample_id in cnv/CNV_bookmarks.csv are release IIDs."""
+    p = CNV_DIR / "CNV_bookmarks.csv"
     if not p.exists():
-        pytest.skip("cnv/HBCD_CNV_bookmark_metrics_clean.csv not found")
+        pytest.skip("cnv/CNV_bookmarks.csv not found")
     df = pd.read_csv(p, sep=",", dtype=str)
     ids = set(df["sample_id"].dropna().astype(str))
     extra = ids - _release_iids()
     assert len(extra) == 0, (
-        f"{len(extra)} sample_id(s) in HBCD_CNV_bookmark_metrics_clean.csv not in release set: "
+        f"{len(extra)} sample_id(s) in CNV_bookmarks.csv not in release set: "
         f"{sorted(extra)[:10]}"
     )
 
@@ -609,6 +611,104 @@ def test_imputed_vcf_subject_set_matches_release():
         assert len(missing) == 0 and len(extra) == 0, (
             f"{vcf.name}: {len(missing)} missing, {len(extra)} extra subjects"
         )
+
+
+def test_imputed_output_completeness():
+    """Every imputed output file expected by step 27 exists in the release dir.
+
+    Step 27 filters each ``chr{chr}.dose.vcf.gz`` found in the source
+    imputation dirs (``c1/c2/c3``) to release subjects, writing
+    ``chr{chr}_dose.vcf.gz`` + ``.tbi``; it also copies ``chr{chr}.info.gz``
+    when the source has one.  This test asserts all of those expected outputs
+    are present so a missing/incomplete chromosome is caught.
+    """
+    if not IMPUTED_DIR.exists():
+        pytest.skip(f"imputed dir not found: {IMPUTED_DIR}")
+
+    source_root = Path(
+        os.environ.get("HBCD_IMPUTATION_DIR", "/projects/standard/basu_hbcd/shared/hbcdSandboxData")
+    ) / "imputed"
+    chunk_dirs = [source_root / c for c in ("c1", "c2", "c3")]
+    found_any = False
+
+    expected = collections.defaultdict(list)  # chr tag -> [output filenames]
+
+    for cd in chunk_dirs:
+        if not cd.exists():
+            continue
+        for src in sorted(cd.glob("chr*.dose.vcf.gz")):
+            tag = src.name[len("chr"):].split(".")[0]
+            expected[tag].append(f"chr{tag}_dose.vcf.gz")
+            expected[tag].append(f"chr{tag}_dose.vcf.gz.tbi")
+            found_any = True
+        for src in sorted(cd.glob("chr*.info.gz")):
+            tag = src.name[len("chr"):].split(".")[0]
+            expected[tag].append(f"chr{tag}.info.gz")
+            found_any = True
+
+    if not found_any:
+        pytest.skip(f"no source imputed files found under {source_root}")
+
+    missing = {
+        tag: [fn for fn in files if not (IMPUTED_DIR / fn).exists()]
+        for tag, files in expected.items()
+    }
+    missing = {tag: fns for tag, fns in missing.items() if fns}
+
+    assert not missing, (
+        "Missing imputed output file(s) for chromosome(s): "
+        + "; ".join(f"{tag}: {', '.join(fns)}" for tag, fns in sorted(missing.items()))
+    )
+
+
+def test_release_tree_completeness():
+    """Every file the release pipeline is expected to produce exists.
+
+    Asserts the full expected layout of the release directory — the whitelist
+    files at the release base, and each subdirectory's deliverables — so a
+    partially-written or failed step is caught even when individual tests
+    would otherwise skip on missing inputs.
+    """
+    release_base = get_release_base()
+    if not RELEASE_DIR.exists():
+        pytest.skip(f"release dir not found: {RELEASE_DIR}")
+
+    expected = set()
+
+    # Release base
+    expected.add(release_base / "keep_list.txt")
+    expected.add(release_base / "temp.fam")
+
+    # GDA/
+    for ext in (".bed", ".bim", ".fam"):
+        expected.add(GDA_DIR / f"merged_chroms{ext}")
+    expected.add(GDA_DIR / "batch.info")
+    expected.add(GDA_DIR / "removed_individuals.txt")
+
+    # genesis/
+    g = GENESIS_DIR
+    expected.add(g / "pcair_weights.tsv")
+    expected.add(g / "pcrelate_relatedness.grm.id")
+    expected.add(g / "pcrelate_relatedness.grm.bin")
+    expected.add(g / "pcrelate_relatedness.grm.N.bin")
+    expected.add(g / "pcrelate_relatedness.grm.gz")
+    expected.add(g / "pcrelate_relatedness.tsv")
+
+    # cnv/
+    expected.add(CNV_DIR / "CNV_slim.txt")
+    expected.add(CNV_DIR / "CNV_bookmarks.csv")
+
+    # imputed/ — every chr{*}_dose.vcf.gz must have its .tbi index
+    vcfs = sorted(IMPUTED_DIR.glob("chr*_dose.vcf.gz"))
+    if vcfs:
+        for vcf in vcfs:
+            expected.add(vcf)
+            expected.add(Path(f"{vcf}.tbi"))
+
+    missing = sorted(p for p in expected if not p.exists())
+    assert not missing, (
+        "Missing expected release file(s):\n" + "\n".join(f"  - {p}" for p in missing)
+    )
 
 
 def test_imputed_vcf_genotype_concordance():

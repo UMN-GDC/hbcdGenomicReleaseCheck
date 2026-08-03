@@ -16,7 +16,7 @@ python 25-filterGenotypeFiles.py
 # Step 26 — PLINK2 --keep to produce release bed/bim/fam:
 bash 26-run_plink_filter.sh
 
-# Step 27 — Filter + de-identify imputed VCFs:
+# Step 27 — Filter imputed VCFs to release subjects (samples already de-ID):
 sbatch 27-filter_imputed_vcf.SLURM
 
 # Step 28 — CNV de-identification only (pscid → release_candid):
@@ -98,9 +98,65 @@ file that was never de-identified (CNV).
 | 25 | `filterGenotypeFiles.py` | **De-ID + Filter** | de-IDed `onlyQc.{bed,bim,fam}`, identifiers, exclusions | `keep_list.txt`, `temp.fam`, `GDA/batch.info`, `GDA/removed_individuals.txt` |
 | 26 | `run_plink_filter.sh` | Filter | `onlyQc`, `temp.fam`, `keep_list.txt` | `GDA/merged_chroms.{bed,bim,fam}` |
 | 27 | `filter_imputed_vcf.SLURM` | Filter | imputed VCFs (c1/c2/c3), `keep_list.txt` | filtered `imputed/chr*_dose.vcf.gz` |
-| 28 | `cnv-deid.py` | **De-ID** | `data_handoff/CNV_slim_clean.txt`, identifiers; `data_handoff/HBCD_CNV_bookmark_metrics_clean.csv` (copied as-is) | de-IDed `cnv/CNV_slim_deid.txt`, copied `cnv/HBCD_CNV_bookmark_metrics_clean_deid.csv` |
+| 28 | `cnv-deid.py` | **De-ID** | `data_handoff/CNV_slim_clean.txt`, identifiers; `data_handoff/HBCD_CNV_bookmark_metrics_clean.csv` (copied as-is) | de-IDed `staging/cnv/CNV_slim_deid.txt`, copied `staging/cnv/CNV_bookmarks_deid.csv` |
 | 29 | `filter_release_outputs.py` | Filter | de-IDed handoff files (GRM, PCs, CNV, bookmarks), `keep_list.txt` | filtered genesis/ + cnv/ files |
 | 30 | `validateExclusions.py` | — | all release output files | console validation report |
+
+## What to run to process the data (Phase A)
+
+Run these in order to go from the raw HBCD transfer to `onlyQc` plus all the
+derivatives needed for release.  Commands assume you are in the repo root.
+Outputs use raw pscid IDs and are **not** de-identified yet.
+
+```bash
+# ── 0. Environment ──────────────────────────────────────────────────
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate python               # Python steps
+module load plink/2.00-alpha-091019
+module load bcftools
+module load R/4.4.2-openblas-rocky8 # R / GENESIS steps
+
+# ── 1. QC removal → onlyQc ─────────────────────────────────────────
+# 00 (optional) filter-concept Venn diagram report
+python 01-onlyQCremoved.py          # remap HBCD.fam IIDs → release_candid; QC_removed.txt
+bash 02-plink_qc_remove.sh          # merge QC_removed + controls; PLINK2 --remove → onlyQc
+
+# ── 2. GRM ──────────────────────────────────────────────────────────
+sbatch 03-grm_gcta.SLURM            # GCTA GRM (per-chromosome parts, merged)
+sbatch 04-grm_plink.SLURM           # PLINK2 GRM (--make-rel)
+
+# ── 3. PC-AiR ───────────────────────────────────────────────────────
+sbatch 05-pcair.SLURM               # runs 06-pca_ir_pipeline.R (KING → PC-AiR)
+
+# ── 4. PC-Relate ────────────────────────────────────────────────────
+sbatch 07-pcrelate.sh               # runs 08-pca_relate_pipeline.R
+Rscript 09-export_pcrelate.R        # export kinship / IBD to CSV + TSV
+
+# ── 5. Imputation: prep → TOPMed → download → unzip ─────────────────
+sbatch --array=0-22 10a-prepare_imputation.SLURM    # autosomes → per-chr VCF
+sbatch 10b-prepare_imputation_X.SLURM               # chrX VCF
+bash 11-submit_topmed.sh            # upload chunks to TOPMed (needs ~/topmedKey)
+sbatch 12a-download_chunk1.SLURM    # download c1
+sbatch 12b-download_chunk2.SLURM    # download c2
+sbatch 12c-download_chunk3.SLURM    # download c3
+sbatch 13a-unzip.SLURM              # unzip chunk 1 (array 1-7)
+sbatch 13b-unzip.SLURM              # unzip chunk 2
+sbatch 13c-unzip.SLURM              # unzip chunk 3
+sbatch 13d-unzip.SLURM              # unzip chrX
+
+# ── 6. Imputation QC (GP precompute + reports) ──────────────────────
+bash 14-submit_gp_prep.sh           # submits 14a-precompute_gp.SLURM array (chr × ancestry)
+sbatch 15-aggregate_gp.SLURM        # combine per-chr GP results → CSVs (after 14)
+quarto render 16-imputation-quality-report.qmd   # imputation quality report
+sbatch 17-cnv-qc-report.SLURM       # CNV genomic profile report (or quarto render)
+```
+
+> **Note:** steps 10–13 currently reference the sandbox `~/hbcdData` layout
+> (see the hardcoded `DATA_DIR` / `OUT` lines).  Adjust those paths before
+> running them on MSI.  Steps 14–16 read the imputed data via
+> `$HBCD_IMPUTATION_DIR` (default `…/shared/hbcdSandboxData`).
+
+---
 
 ## Release directory
 
@@ -131,9 +187,13 @@ export HBCD_IMPUTATION_DIR=/projects/standard/basu_hbcd/shared/hbcdSandboxData
 #   │   │   └── chr*_dose.vcf.gz + .tbi
 #   │   └── cnv/
 #   │       ├── CNV_slim.txt
-#   │       └── HBCD_CNV_bookmark_metrics_clean.csv
+#   │       └── CNV_bookmarks.csv
 #   ├── keep_list.txt
-#   └── temp.fam
+#   ├── temp.fam
+#   └── staging/
+#       └── cnv/                       # intermediates (not release deliverables)
+#           ├── CNV_slim_deid.txt
+#           └── CNV_bookmarks_deid.csv
 ```
 
 To use a different release:
@@ -245,14 +305,14 @@ Source file: `data_handoff/CNV_slim_clean.txt` — sample IDs are in the format
 2. Extracts pscid + relationship suffix (C/M) from each `sample_id`
 3. Maps pscid → `release_candid` via the identifiers crosswalk
 4. Builds de-identified IIDs (`{release_candid}{C|M}`)
-5. Writes de-identified `cnv/CNV_slim_deid.txt`
+5. Writes de-identified `staging/cnv/CNV_slim_deid.txt`
 
 ### CNV bookmark metrics (already de-identified)
 
 Source file: `data_handoff/HBCD_CNV_bookmark_metrics_clean.csv` — sample IDs
 are already in de-identified format (`{release_candid}{C|M}`, e.g. `2910626018M`).
 
-Copied as-is to `cnv/HBCD_CNV_bookmark_metrics_clean_deid.csv` (no de-ID needed).
+Copied as-is to `staging/cnv/CNV_bookmarks_deid.csv` (no de-ID needed).
 
 ```bash
 conda run -n python python 28-cnv-deid.py
@@ -277,7 +337,7 @@ Filtering methods per file type (outputs → `genesis/` or `cnv/`):
 | `genesis/pcair_weights.tsv` | `subject_id` | `filter_text()` |
 | `genesis/pcrelate_relatedness.tsv` | `ID1`, `ID2` | `filter_csv()` |
 | `cnv/CNV_slim.txt` | `sample_id` | inline filter |
-| `cnv/HBCD_CNV_bookmark_metrics_clean.csv` | `sample_id` | inline filter |
+| `cnv/CNV_bookmarks.csv` | `sample_id` | inline filter |
 
 ```bash
 conda run -n python python 29-filter_release_outputs.py
@@ -312,7 +372,7 @@ and checks for contamination by excluded subjects:
 - **All derivative files** — IID columns checked against the excluded-IID set
   (`{exc_rc}C` / `{exc_rc}M`)
 - **cnv/CNV_slim.txt** — `sample_id` column
-- **cnv/HBCD_CNV_bookmark_metrics_clean.csv** — `sample_id` column
+- **cnv/CNV_bookmarks.csv** — `sample_id` column
 - **Cross-check** — warns if any IID is found that's neither in the release set
   nor the exclusion set (catches unexpected subjects)
 
@@ -322,39 +382,50 @@ conda run -n python python 30-validateExclusions.py
 
 ---
 
-## Typical run sequence (Phase C only)
+## What to run to filter, de-ID & validate for release (Phase C)
 
-Assumes Phases A–B (QC, derivatives, de-ID) are complete.  Step 25 and 26 are
-required first; steps 27–29 are independent of each other.
+Assumes Phases A–B (QC, derivatives, de-ID) are complete and all source files
+live in `shared/data/` and `shared/data_handoff/`.  Step 25 must run before
+26; steps 27–29 are independent of each other and can run after 26.  Steps 30
+and the test suite are the final quality gate.
 
 ```bash
-# 0. Environment
+# ── 0. Environment ──────────────────────────────────────────────────
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate python
+module load plink/2.00-alpha-091019   # step 26
+module load bcftools                  # step 27
 
-# 1. Build keep list + temp.fam (de-ID + filter logic)
+export HBCD_RELEASE=br_21p3
+export HBCD_DATA_DIR=/projects/standard/basu_hbcd/shared/data
+export HBCD_IMPUTATION_DIR=/projects/standard/basu_hbcd/shared/hbcdSandboxData
+
+# ── 1. Build the release whitelist (de-ID + filter logic) ────────────
+# 25 → keep_list.txt, temp.fam, GDA/batch.info, GDA/removed_individuals.txt
 python 25-filterGenotypeFiles.py
 
-# 2. PLINK2 --keep → GDA/merged_chroms
+# ── 2. PLINK2 --keep → GDA/merged_chroms.{bed,bim,fam} ───────────────
 ./26-run_plink_filter.sh
 
-# 3. Filter + de-identify imputed VCFs (SLURM array, 24 tasks — chromosomes 1–22 + X)
-sbatch 27-filter_imputed_vcf.SLURM
+# ── 3. Filter imputed VCFs to release subjects (samples already de-ID) ──
+sbatch 27-filter_imputed_vcf.SLURM    # SLURM array 0-23 → imputed/chr*_dose.vcf.gz
 
-# 4. De-identify CNV (the one file that still has raw pscids)
-python 28-cnv-deid.py
+# ── 4. De-identify CNV (the only file that still has raw pscids) ─────
+python 28-cnv-deid.py                 # pscid → release_candid; bookmarks copied as-is
 
-# 5. Filter all de-identified handoff derivatives (GRM, PCs, CNV)
-python 29-filter_release_outputs.py
+# ── 5. Filter all de-IDed handoff derivatives to release IIDs ─────────
+python 29-filter_release_outputs.py   # → genesis/ + cnv/
 
-# 6. Validate every output for excluded-subject contamination
+# ── 6. Validate no excluded subject leaked into any output ────────────
 python 30-validateExclusions.py
 
-# 7. Run full test suite
+# ── 7. Full test suite ────────────────────────────────────────────────
 python -m pytest tests/ -v
 ```
 
-Steps 3–4 are de-identification; step 5 filters everything.  Steps 6–7 should run last.
+Step 27 is **filter-only** (VCF samples are already de-identified).  Step 28 is
+the only de-identification in this phase.  Step 29 filters every derivative to
+`keep_list.txt`.  Steps 6–7 should always run last.
 
 ---
 
@@ -374,7 +445,7 @@ python 25-filterGenotypeFiles.py
 ./26-run_plink_filter.sh
 
 # 3–5. Re-filter everything (independent of each other)
-sbatch 27-filter_imputed_vcf.SLURM          # VCFs (de-id + filter)
+sbatch 27-filter_imputed_vcf.SLURM          # VCFs (filter-only)
 python 28-cnv-deid.py                        # CNV de-ID (pscid → release_candid)
 python 29-filter_release_outputs.py          # filter all derivatives + CNV
 
@@ -418,10 +489,12 @@ IID checks for release derivative outputs:
 | `test_pcair_32pcs_clean_ids_are_release` | All subject_ids in genesis/pcair_weights.tsv are release |
 | `test_pcrelate_grm_pairwise_ids_are_release` | All ID1/ID2 in genesis/pcrelate_relatedness.tsv are release |
 | `test_cnv_slim_clean_ids_are_release` | All sample_ids in cnv/CNV_slim.txt are release |
-| `test_cnv_bookmark_ids_are_release` | All sample_ids in cnv/HBCD_CNV_bookmark_metrics_clean.csv are release |
+| `test_cnv_bookmark_ids_are_release` | All sample_ids in cnv/CNV_bookmarks.csv are release |
 | `test_imputed_vcf_sample_ids_deidentified` | All imputed VCF sample IDs match `^\d{10}[CM]$` |
 | `test_imputed_vcf_subject_count_matches_release` | Per-chromosome sample count = release total |
 | `test_imputed_vcf_subject_set_matches_release` | IID set matches release IIDs (no missing/extra) |
+| `test_imputed_output_completeness` | Every chr{*}_dose.vcf.gz/.tbi + .info.gz expected by step 27 is present |
+| `test_release_tree_completeness` | Full expected release tree (base, GDA, genesis, cnv, imputed) exists; every VCF has its .tbi |
 | `test_imputed_vcf_genotype_concordance` | 3 subjects × 5 chr22 PLINK/VCF genotypes match (catches shuffling) |
 
 ### `tests/test_exclusions.py` — 4 tests

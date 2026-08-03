@@ -10,11 +10,11 @@
 import sys
 from pathlib import Path
 import pandas as pd
-from _lib import DATA_DIR, get_release_base, get_release_dir, load_identifiers
+from _lib import DATA_DIR, get_release_staging_dir, load_identifiers
 
 CNV_SOURCE_DIR = DATA_DIR.parent / "data_handoff"
 CNV_INPUT = CNV_SOURCE_DIR / "CNV_slim_clean.txt"
-CNV_DEID_DIR = get_release_dir() / "cnv"
+CNV_DEID_DIR = get_release_staging_dir() / "cnv"
 CNV_DEID_DIR.mkdir(parents=True, exist_ok=True)
 CNV_DEID_OUT = CNV_DEID_DIR / "CNV_slim_deid.txt"
 
@@ -67,7 +67,7 @@ print(f"  {before} → {len(cnv)} rows ({((before - len(cnv)) / before * 100):.1
 print("\n--- CNV bookmark metrics (already de-identified) ---")
 
 BM_INPUT = CNV_SOURCE_DIR / "HBCD_CNV_bookmark_metrics_clean.csv"
-BM_DEID_OUT = CNV_DEID_DIR / "HBCD_CNV_bookmark_metrics_clean_deid.csv"
+BM_DEID_OUT = CNV_DEID_DIR / "CNV_bookmarks_deid.csv"
 
 if not BM_INPUT.exists():
     print(f"  SKIP (not found): {BM_INPUT}")

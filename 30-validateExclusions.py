@@ -309,8 +309,8 @@ _check_file(
 # ── CNV bookmark metrics (cnv/) ──────────────────────────────────────────
 
 _check_file(
-    cnv_dir / "HBCD_CNV_bookmark_metrics_clean.csv",
-    "cnv/HBCD_CNV_bookmark_metrics_clean.csv",
+    cnv_dir / "CNV_bookmarks.csv",
+    "cnv/CNV_bookmarks.csv",
     ["sample_id"],
     reader="csv",
 )
@@ -345,7 +345,7 @@ for label, path in derivatives:
         iid_set = set(ids)
     elif path.name == "CNV_slim.txt":
         iid_set = _unique_iids_from(path, "sample_id", sep="\t")
-    elif path.name == "HBCD_CNV_bookmark_metrics_clean.csv":
+    elif path.name == "CNV_bookmarks.csv":
         iid_set = _unique_iids_from(path, "sample_id", sep=",")
     elif path.name.endswith(".tsv"):
         df = pd.read_csv(path, sep="\t", dtype=str)

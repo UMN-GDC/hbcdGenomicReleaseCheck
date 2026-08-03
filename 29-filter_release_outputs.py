@@ -33,6 +33,7 @@ else:
 release_base = RELEASE_DIR.parent
 genesis_dir = RELEASE_DIR / "genesis"
 cnv_dir = RELEASE_DIR / "cnv"
+staging_cnv_dir = release_base / "staging" / "cnv"
 
 # ── tee stdout to log file ──────────────────────────────────────────────
 class _Tee:
@@ -206,7 +207,7 @@ filter_text(
 # CNV slim clean (de-identified by 28-cnv-deid.py)
 # ===========================================================================
 print("\n--- CNV slim clean → cnv/ ---")
-cnv_path = cnv_dir / "CNV_slim_deid.txt"
+cnv_path = staging_cnv_dir / "CNV_slim_deid.txt"
 cnv = pd.read_csv(cnv_path, sep="\t", dtype=str)
 before = len(np.unique(cnv.sample_id))
 cnv = cnv[cnv["sample_id"].isin(release_iids)]
@@ -219,14 +220,14 @@ print(f"  CNV_slim.txt: {before} → {len(np.unique(cnv.sample_id))} unique Subj
 # CNV bookmark metrics (de-identified by 28-cnv-deid.py)
 # ===========================================================================
 print("\n--- CNV bookmark metrics → cnv/ ---")
-bm_deid_path = cnv_dir / "HBCD_CNV_bookmark_metrics_clean_deid.csv"
+bm_deid_path = staging_cnv_dir / "CNV_bookmarks_deid.csv"
 bm = pd.read_csv(bm_deid_path, sep=",", dtype=str)
 bm_before = len(np.unique(bm.sample_id))
 bm = bm[bm["sample_id"].isin(release_iids)]
-bm_out = cnv_dir / "HBCD_CNV_bookmark_metrics_clean.csv"
+bm_out = cnv_dir / "CNV_bookmarks.csv"
 bm_out.parent.mkdir(parents=True, exist_ok=True)
 bm.to_csv(bm_out, sep=",", index=False)
-print(f"  HBCD_CNV_bookmark_metrics_clean.csv: {bm_before} → {len(np.unique(bm.sample_id))} unique Subjects")
+print(f"  CNV_bookmarks.csv: {bm_before} → {len(np.unique(bm.sample_id))} unique Subjects")
 
 # ===========================================================================
 # Cross-form subject count consistency
@@ -240,7 +241,7 @@ def _unique_iids_from(path, id_col, sep="\t"):
     return set(df[id_col].dropna().astype(str))
 
 cnv_iids = _unique_iids_from(cnv_dir / "CNV_slim.txt", "sample_id", sep="\t")
-bm_iids = _unique_iids_from(cnv_dir / "HBCD_CNV_bookmark_metrics_clean.csv", "sample_id", sep=",")
+bm_iids = _unique_iids_from(cnv_dir / "CNV_bookmarks.csv", "sample_id", sep=",")
 
 print(f"  CNV_slim.txt unique IIDs            : {len(cnv_iids):>6}")
 print(f"  Bookmarks unique IIDs               : {len(bm_iids):>6}")

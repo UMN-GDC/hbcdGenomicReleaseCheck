@@ -28,6 +28,15 @@ def get_release_base(release=None):
     return get_release_dir(release).parent
 
 
+def get_release_staging_dir(release=None):
+    """Return the staging directory for intermediate (unfiltered) files.
+
+    Located inside the release base so cleanup/versioning travels with the
+    release: ``<DATA_DIR.parent>/HBCD_genomics_release_<release>/staging/``.
+    """
+    return get_release_base(release) / "staging"
+
+
 PAR_VISIT_FILE = "par_visit_data_br21_1.tsv"
 IDENTIFIERS_FILE = "release_identifiers_20260628.csv"
 EXCLUSION_FILE = "HBCD_genetics_QC1_missing_race_LORIS.xlsx"
