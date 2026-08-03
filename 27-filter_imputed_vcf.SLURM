@@ -23,7 +23,8 @@ set +u                              # conda activate.d scripts touch unbound var
 conda activate gdcPipeline
 set -u                              # restore strictness
 
-module load bcftools  # load AFTER conda so module lib paths survive activation
+module unload bcftools 2>/dev/null || true   # no-op guard: ensure a clean re-load after conda
+module load bcftools
 
 DATA_DIR="${HBCD_DATA_DIR:-/projects/standard/basu_hbcd/shared/data}"
 : "${HBCD_RELEASE:=br_21p3}"

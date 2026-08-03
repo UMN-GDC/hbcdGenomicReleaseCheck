@@ -26,7 +26,8 @@ set +u                             # conda activate.d scripts touch unbound vars
 conda activate gdcPipeline  # shared env: python + R (tidyverse)
 set -u                             # restore strictness
 
-module load bcftools  # load AFTER conda so its scripts paths survive activation
+module unload bcftools 2>/dev/null || true   # no-op guard: ensure a clean re-load after conda
+module load bcftools
 
 CHROMS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X)
 IMPDIR="${HBCD_IMPUTATION_DIR:-/projects/standard/basu_hbcd/shared/hbcdSandboxData}/imputed"
