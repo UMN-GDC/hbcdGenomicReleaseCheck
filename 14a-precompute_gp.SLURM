@@ -37,7 +37,7 @@ ANCESTRY_FILE="${IMPUTATION_ROOT}/sed_basic_demographics.tsv"
 #                                     4=Hawaiian/PI, 5=Two+, 6=Other, 7=Unknown
 IMPUTED_DIRS=($IMPDIR/c1 $IMPDIR/c2 $IMPDIR/c3)
 CACHE_DIR=$IMPDIR/gp_cache
-SCRIPT_DIR=$(dirname "$0")
+SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(dirname "$0")}"
 mkdir -p "$CACHE_DIR" logs
 
 # ── Determine chromosome and ancestry mode ────────────────────────────
