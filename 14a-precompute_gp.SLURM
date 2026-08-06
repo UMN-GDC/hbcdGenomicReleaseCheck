@@ -221,7 +221,7 @@ BC_ARGS=()
 echo "  Filtering: VCF INFO/MAF"
 bcftools view -i 'MAF>0 && MAF<0.05' "${BC_ARGS[@]}" "$VCF_FILE" -Ou 2>/dev/null \
     | bcftools query -f '%CHROM\t%POS[\t%GP]\n' \
-    | conda run -n gdcPipeline python "$SCRIPT_DIR/compute_gp_stats.py" \
+    | env -u PYTHONPATH "$CONDA_PREFIX/bin/python" "$SCRIPT_DIR/compute_gp_stats.py" \
         --ancestry "$ANCESTRY_FILE_USE" \
         --chr "$chr" \
         --outdir "$TMPDIR"
