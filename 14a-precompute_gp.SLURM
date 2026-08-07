@@ -91,7 +91,12 @@ else
 fi
 
 # ── Ancestry mapping (cached, one-off per release) ───────────────────
+# Multiple array tasks race for the cache; only ONE task builds the shared
+# files (single-writer lock). The rest wait for sample_ancestry.txt.
 if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
+    LOCK="$CACHE_DIR/.ancestry_lock"
+    if mkdir "$LOCK" 2>/dev/null; then
+        trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
     FIRST_VCF=$(find "${IMPUTED_DIRS[@]}" \
         -name "*.vcf.gz" ! -name "*.tbi" 2>/dev/null | head -1)
 
@@ -105,7 +110,9 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
         tabix -f -p vcf "$FIRST_VCF"
     fi
 
-    bcftools query -l "$FIRST_VCF" > "$CACHE_DIR/sample_order.txt"
+    # Atomic write so waiters never see a partial sample_order.txt
+    bcftools query -l "$FIRST_VCF" > "$CACHE_DIR/.sample_order.txt.tmp"
+    mv "$CACHE_DIR/.sample_order.txt.tmp" "$CACHE_DIR/sample_order.txt"
 
     # Create typed sample list: <clean_sid> <type>  (type = c or m)
     # Used for ancestry mapping: C-type → child race (ses-V02),
@@ -170,7 +177,23 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
                   file.path("'"$CACHE_DIR"'", "sample_ancestry.txt"),
                   col_names = FALSE)
     '
+    rmdir "$LOCK"
+    trap - EXIT
+    else
+        # Another task is building the ancestry cache; wait for it
+        tries=0
+        while [ ! -f "$CACHE_DIR/sample_ancestry.txt" ] && [ "$tries" -lt 720 ]; do
+            sleep 5; tries=$((tries + 1))
+        done
+        [ -f "$CACHE_DIR/sample_ancestry.txt" ] || \
+            { echo "ERROR: timed out waiting for ancestry cache (builder failed?)" >&2; exit 1; }
+    fi
 fi
+
+# Ensure the shared files exist before the per-ancestry step below
+while [ ! -f "$CACHE_DIR/sample_order.txt" ] || [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; do
+    sleep 2
+done
 
 n_unknown=$(awk '$2 == "UNKNOWN" {c++} END {print c+0}' \
     "$CACHE_DIR/sample_ancestry.txt")
