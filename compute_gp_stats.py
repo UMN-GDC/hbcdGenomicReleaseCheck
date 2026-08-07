@@ -38,8 +38,9 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
 
     anc_df = pd.read_csv(args.ancestry, sep="\t", header=None,
-                         names=["pos", "ancestry"])
-    ancestry = anc_df["ancestry"].values
+                         names=["pos", "ancestry"],
+                         keep_default_na=True)
+    ancestry = anc_df["ancestry"].fillna("UNKNOWN").astype(str).values
     n_samples = len(ancestry)
 
     unique_anc = list(dict.fromkeys(ancestry))

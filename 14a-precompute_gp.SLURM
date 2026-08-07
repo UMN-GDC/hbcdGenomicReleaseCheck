@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=gp_prep
 #SBATCH --array=0-23
-#SBATCH --time=04:00:00
+#SBATCH --time=12:00:00
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=2
 #SBATCH --output=logs/gp_prep_%A_%a.out
