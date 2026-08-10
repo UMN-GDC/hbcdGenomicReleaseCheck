@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=gp_prep
 #SBATCH --array=0-23
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=2
 #SBATCH --output=logs/gp_prep_%A_%a.out
@@ -225,11 +225,11 @@ if [ -n "$ANC" ]; then
     echo "  Filtering to $ANC: $(wc -l < "$SAMPLE_FILE") samples"
 fi
 
-# ── Count low-MAF variants ──────────────────────────────────────────
-n_low_maf=$(bcftools view -i 'MAF>0 && MAF<0.05' "$VCF_FILE" 2>/dev/null \
-    | bcftools query -f '%CHROM\t%POS\n' | wc -l)
+# ── Check for low-MAF variants (early-exit: stop at first match) ────
+n_low_maf=$(bcftools view -i 'MAF>0 && MAF<0.05' "$VCF_FILE" -H 2>/dev/null \
+    | head -1 | wc -l || true)
 
-echo "  Low-MAF variants (MAF<0.05): $n_low_maf"
+echo "  Low-MAF variants (MAF<0.05) present: $n_low_maf"
 
 OUT_RDS="$CACHE_DIR/chr${chr}${ANC:+_$ANC}.rds"
 
@@ -250,7 +250,8 @@ BC_ARGS=()
 [ -n "$ANC" ] && BC_ARGS+=(-S "$SAMPLE_FILE")
 
 echo "  Filtering: VCF INFO/MAF"
-bcftools view -i 'MAF>0 && MAF<0.05' "${BC_ARGS[@]}" "$VCF_FILE" -Ou 2>/dev/null \
+bcftools view -i 'MAF>0 && MAF<0.05' "${BC_ARGS[@]}" "$VCF_FILE" -Ou --threads 2 \
+    2>/dev/null \
     | bcftools query -f '%CHROM\t%POS[\t%GP]\n' \
     | env -u PYTHONPATH "$CONDA_PREFIX/bin/python" "$SCRIPT_DIR/compute_gp_stats.py" \
         --ancestry "$ANCESTRY_FILE_USE" \
