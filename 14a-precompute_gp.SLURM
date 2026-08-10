@@ -35,6 +35,8 @@ IMPDIR="${IMPUTATION_ROOT}/imputed"
 ANCESTRY_FILE="${IMPUTATION_ROOT}/sed_basic_demographics.tsv"
 # sed_basic_demographics_child_race: 0=White, 1=Black, 2=AIAN, 3=Asian,
 #                                     4=Hawaiian/PI, 5=Two+, 6=Other, 7=Unknown
+# sed_basic_demographics_screen_mother_race: 1=Asian, 2=White, 3=Black,
+#                                     4=AIAN, 5=Hawaiian/PI, 6=Two+, 7=Other
 IMPUTED_DIRS=($IMPDIR/c1 $IMPDIR/c2 $IMPDIR/c3)
 CACHE_DIR=$IMPDIR/gp_cache
 SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(dirname "$0")}"
@@ -138,6 +140,12 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
                         "3" = "ASN", "4" = "HPI", "5" = "2PLUS",
                         "6" = "OTH", "7" = "UNK")
 
+        # Mother race uses a DIFFERENT scale than child race:
+        # 1=Asian, 2=White, 3=Black, 4=AIAN, 5=Hawaiian/PI, 6=Two+, 7=Other
+        mother_race_names <- c("1" = "ASN", "2" = "WHT", "3" = "BLK",
+                               "4" = "AIAN", "5" = "HPI", "6" = "2PLUS",
+                               "7" = "OTH")
+
         child_lookup <- dm %>%
             filter(!is.na(.data[["sed_basic_demographics_child_race"]]),
                    session_id == "ses-V02") %>%
@@ -156,7 +164,7 @@ if [ ! -f "$CACHE_DIR/sample_ancestry.txt" ]; then
             slice_max(n, n = 1, with_ties = FALSE) %>%
             ungroup() %>%
             transmute(sid = str_remove(tolower(participant_id), "^sub-"),
-                      ancestry = race_names[as.character(sed_basic_demographics_screen_mother_race)])
+                      ancestry = mother_race_names[as.character(sed_basic_demographics_screen_mother_race)])
 
         cat("--- DEBUG: child_lookup:", nrow(child_lookup), "rows ---\n")
         print(head(child_lookup, 3))
