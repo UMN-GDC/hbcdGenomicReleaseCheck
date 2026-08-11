@@ -121,7 +121,7 @@ def test_removed_individuals_absent():
     p = GDA_DIR / "removed_individuals.txt"
     if not p.exists():
         pytest.skip("GDA/removed_individuals.txt not found")
-    removed = pd.read_csv(p, delim_whitespace=True, header=None, names=["IID"])
+    removed = pd.read_csv(p, sep=r"\s+", header=None, names=["IID"])
     removed_iids = set(removed["IID"].astype(str))
 
     overlap = fam_iids & removed_iids

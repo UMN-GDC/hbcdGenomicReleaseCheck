@@ -145,10 +145,10 @@ sbatch 13c-unzip.SLURM              # unzip chunk 3
 sbatch 13d-unzip.SLURM              # unzip chrX
 
 # ── 6. Imputation QC (GP precompute + reports) ──────────────────────
-bash 14-submit_gp_prep.sh           # submits 14a-precompute_gp.SLURM array (chr × ancestry)
-sbatch 15-aggregate_gp.SLURM        # combine per-chr GP results → CSVs (after 14)
-quarto render 16-imputation-quality-report.qmd   # imputation quality report
-sbatch 17-cnv-qc-report.SLURM       # CNV genomic profile report (or quarto render)
+bash futureScripts/14-submit_gp_prep.sh           # submits futureScripts/14a-precompute_gp.SLURM array (chr × ancestry)
+sbatch futureScripts/15-aggregate_gp.SLURM        # combine per-chr GP results → CSVs (after 14)
+quarto render futureScripts/16-imputation-quality-report.qmd   # imputation quality report
+sbatch futureScripts/17-cnv-qc-report.SLURM       # CNV genomic profile report (or quarto render)
 ```
 
 > **Note:** steps 10–13 currently reference the sandbox `~/hbcdData` layout
@@ -355,9 +355,9 @@ each chromosome, faceted by chromosome with independent scales via
 subject type (C = child, M = mother).
 
 ```bash
-sbatch 17-cnv-qc-report.SLURM
+sbatch futureScripts/17-cnv-qc-report.SLURM
 # or render directly:
-quarto render 17-cnv-qc-report.qmd
+quarto render futureScripts/17-cnv-qc-report.qmd
 ```
 
 ---

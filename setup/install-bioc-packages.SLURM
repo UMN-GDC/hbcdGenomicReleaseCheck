@@ -13,4 +13,4 @@
 # The GRM is computed in chromosome chunks (--make-grm-part) then merged.
 
 module load R/4.4.2-openblas-rocky8
-Rscript install-bioc-packages.R
+Rscript "$(dirname "$0")/install-bioc-packages.R"

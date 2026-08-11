@@ -41,7 +41,7 @@ def _load_data():
     batch = batch.rename(columns={batch.columns[0]: "IID"})
     excluded = pd.read_csv(
         GDA_DIR / "removed_individuals.txt",
-        delim_whitespace=True,
+        sep=r"\s+",
         header=None,
         names=["IID"],
     )
@@ -359,11 +359,13 @@ def test_variant_count_preserved():
         str(DATA_DIR / "HBCD.bim"),
         sep=r"\s+", header=None,
         names=["CHR", "SNP", "GD", "BP", "A1", "A2"],
+        dtype={"CHR": str},
     )
     out = pd.read_csv(
         GDA_DIR / "merged_chroms.bim",
         sep=r"\s+", header=None,
         names=["CHR", "SNP", "GD", "BP", "A1", "A2"],
+        dtype={"CHR": str},
     )
     assert len(src) == len(out), (
         f"variant count mismatch: {len(src)} source vs {len(out)} output"
@@ -735,8 +737,9 @@ def test_imputed_vcf_genotype_concordance():
         GDA_DIR / "merged_chroms.bim",
         sep=r"\s+", header=None,
         names=["CHR", "SNP", "GD", "BP", "A1", "A2"],
+        dtype={"CHR": str},
     )
-    bim_chr22 = bim[bim["CHR"] == 22]
+    bim_chr22 = bim[bim["CHR"] == "22"]
     if len(bim_chr22) == 0:
         pytest.skip("No chr22 variants in PLINK data")
 
