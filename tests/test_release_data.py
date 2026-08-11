@@ -767,11 +767,11 @@ def test_imputed_vcf_genotype_concordance():
 
         with open(tmpdir / "keep.txt", "w") as f:
             for iid in test_iids:
-                f.write(f"0 {iid}\n")
+                f.write(f"{iid[:-1]} {iid}\n")
 
         with open(tmpdir / "extract.txt", "w") as f:
             for bp in test_positions:
-                f.write(f"22:{bp}\n")
+                f.write(f"22 {bp} {bp}\n")
 
         subprocess.run(
             [
@@ -779,7 +779,7 @@ def test_imputed_vcf_genotype_concordance():
                 "--bfile", str(GDA_DIR / "merged_chroms"),
                 "--chr", "22",
                 "--keep", str(tmpdir / "keep.txt"),
-                "--extract", str(tmpdir / "extract.txt"),
+                "--extract", "bed1", str(tmpdir / "extract.txt"),
                 "--export", "vcf",
                 "--out", str(tmpdir / "plink_subset"),
             ],
