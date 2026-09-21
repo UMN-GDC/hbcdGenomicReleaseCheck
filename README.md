@@ -5,6 +5,11 @@
 These steps produce the release dataset.  Run **Phase C** scripts in order:
 
 ```bash
+export HBCD_RELEASE=br_21p3
+
+# Imputation input data root (imputed/ + data/ staging):
+export HBCD_IMPUTATION_DIR=/projects/standard/basu_hbcd/shared/hbcdSandboxData
+
 # ── 1. De-identify ──────────────────────────────────────────────────
 # Map raw pscid IDs → anonymous release_candid in every source file.
 # This must happen BEFORE filtering so that a 3rd party can safely
