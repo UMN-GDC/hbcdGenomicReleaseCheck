@@ -184,7 +184,12 @@ export HBCD_IMPUTATION_DIR=/projects/standard/basu_hbcd/shared/hbcdSandboxData
 #   │   │   ├── pcrelate_relatedness.grm.gz
 #   │   │   └── pcrelate_relatedness.tsv
 #   │   ├── imputed/
-#   │   │   └── chr*_dose.vcf.gz + .tbi
+#   │   │   ├── chr*_dose.vcf.gz + .tbi
+#   │   │   ├── chr*.info.gz
+#   │   │   ├── batch*-snps-typed-only.txt  # SNPs used for haplotype est. but not in reference panel
+#   │   │   ├── batch*-snps-excluded.txt    # SNPs excluded from imputation
+#   │   │   ├── batch*-chunks-excluded.txt  # Genomic regions excluded from imputation
+#   │   │   └── batch*-quality-control.html # Per-chromosome-batch QC report
 #   │   └── cnv/
 #   │       ├── CNV_slim.txt
 #   │       └── CNV_bookmarks.csv
@@ -283,6 +288,9 @@ Source VCF sample IDs are already de-identified (`{release_candid}{C|M}`, e.g.
 3. Writes the keep-list intersection (`keep_old_<chr>.txt`)
 4. `bcftools view --samples-file` keeps matching subjects
 5. Writes `chr<chr>_dose.vcf.gz` + tabix index + copies `.info.gz`
+6. Copies per-chunk imputation QC statistics files (snps-typed-only.txt,
+   snps-excluded.txt, chunks-excluded.txt, quality-control.html) to
+   `imputed/` with `batch{N}-` prefix (on task 0 only)
 
 ```bash
 sbatch 27-filter_imputed_vcf.SLURM
@@ -427,6 +435,31 @@ Step 27 is **filter-only** (VCF samples are already de-identified).  Step 28 is
 the only de-identification in this phase.  Step 29 filters every derivative to
 `keep_list.txt`.  Steps 6–7 should always run last.
 
+### Convenience: `run_release_pipeline.sh`
+
+A single wrapper script that runs the entire Phase C pipeline in order
+(25 → 26 → 27 → 28 → 29 → 30), including submitting and waiting for the
+SLURM array job:
+
+```bash
+export HBCD_RELEASE=br_21p3
+export HBCD_DATA_DIR=/projects/standard/basu_hbcd/shared/data
+export HBCD_IMPUTATION_DIR=/projects/standard/basu_hbcd/shared/hbcdSandboxData
+./run_release_pipeline.sh
+```
+
+The script:
+1. Activates the `gdcPipeline` conda environment
+2. Runs step 25 (de-ID + filter)
+3. Runs step 26 (PLINK2 --keep)
+4. Submits step 27 as a SLURM array job and polls until complete
+5. Runs step 28 (CNV de-identification)
+6. Runs step 29 (filter all derivatives)
+7. Runs step 30 (validate exclusions)
+
+All env vars have sensible defaults — only `HBCD_RELEASE` typically needs
+to be set if using a non-default release tag.
+
 ---
 
 ## When the exclusion list changes
@@ -494,7 +527,8 @@ IID checks for release derivative outputs:
 | `test_imputed_vcf_subject_count_matches_release` | Per-chromosome sample count = release total |
 | `test_imputed_vcf_subject_set_matches_release` | IID set matches release IIDs (no missing/extra) |
 | `test_imputed_output_completeness` | Every chr{*}_dose.vcf.gz/.tbi + .info.gz expected by step 27 is present |
-| `test_release_tree_completeness` | Full expected release tree (base, GDA, genesis, cnv, imputed) exists; every VCF has its .tbi |
+| `test_imputation_qc_files_content` | batch*-prefixed QC/statistics files are non-empty and have expected columns |
+| `test_release_tree_completeness` | Full expected release tree (base, GDA, genesis, cnv, imputed) exists; every VCF has its .tbi; QC statistics files present |
 | `test_imputed_vcf_genotype_concordance` | 3 subjects × 5 chr22 PLINK/VCF genotypes match (catches shuffling) |
 
 ### `tests/test_exclusions.py` — 4 tests

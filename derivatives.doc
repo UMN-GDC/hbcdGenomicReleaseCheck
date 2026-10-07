@@ -1,0 +1,47 @@
+# HBCD Genomics Data Release Documentation
+
+## Micro-Array-Based Data
+
+The HEALthy Brain and Child Development (HBCD) Study microarray genetic data release provides processed, quality-controlled, and de-identified genotyping data for participating children and biological mothers. Unlike studies utilizing Smokescreen or other arrays, HBCD utilizes the **Illumina Global Diversity Array (GDA)**.
+
+### Overview of Processing and Quality Control
+1. **Sample & Variant QC**: Initial genotype data undergo rigorous quality control to remove low-quality samples, sex mismatches, relatedness anomalies, and poorly performing markers.
+2. **De-Identification**: All sample identifiers are mapped from primary study IDs (PSCIDs) to standardized HBCD release candidate IDs (`release_candid`) with relationship suffixes (`C` for child, `M` for mother).
+3. **Subject Whitelist Filtering**: Deliverables are filtered against the master HBCD release subject whitelist (`keep_list.txt`), which removes participants flagged in manual QC review, control subjects, and those on study exclusion lists.
+4. **Genetic Ancestry & Relatedness**: Principal Component Analysis (via PC-AiR) and relatedness estimation (via PC-Relate and GCM) are performed to characterize population structure and kinship across self-reported ancestral groups.
+
+### Deliverables & File Formats
+- **PLINK Binary Fileset (`genotype_microarray/GDA/merged_chroms.{bed,bim,fam}`)**: Cleaned, de-identified, and release-filtered marker data in binary PLINK format.
+- **Batch Information (`genotype_microarray/GDA/batch.info`)**: Tab-delimited file mapping release subjects to plate numbers and visit batches.
+- **Relatedness & Population Structure (`genotype_microarray/genesis/`)**: Includes PC-AiR PC weights (`pcair_weights.tsv`) and PC-Relate genetic relationship matrices (`pcrelate_relatedness.grm.*`, pairwise TSV, and gzipped text format).
+
+---
+
+## Imputed SNP and Indel Population-Level VCFs
+
+To maximize genomic coverage, HBCD performs genome-wide genotype imputation using high-density reference panels. Note that HBCD sequencing data is not generated; imputation is derived entirely from our GDA microarray data.
+
+### Imputation Pipeline
+1. **Pre-Imputation Preparation**: Microarray datasets (onlyQc) are filtered to exclude ambiguous palindromic variants, non-ACGT alleles, and multiallelic sites. Strand and allele orientation are aligned to reference genome build **GRCh38** using `bcftools +fixref`.
+2. **Phasing & Imputation**: Pre-phasing is performed using **Eagle2**, followed by imputation via **Minimac4** on the **TOPMed Reference Panel (Release r3)** across multi-chromosome chunks.
+3. **Release Filtering**: Imputed dosage VCFs are filtered to retain only release-whitelisted subjects and are paired with per-variant INFO metrics.
+
+### Deliverables & File Formats
+- **Imputed Dosage VCFs (`genotype_microarray/imputed/chr*_dose.vcf.gz` + `.tbi`)**: Per-chromosome bgzipped VCF files containing estimated genotype dosages and posterior probabilities (GP) for release subjects, accompanied by Tabix index files.
+- **Variant Quality Metrics (`genotype_microarray/imputed/chr*.info.gz`)**: Per-variant imputation quality scores ($R^2$) and minor allele frequencies (MAF) from TOPMed.
+- **Imputation Yield & GP Statistics (`gp_cache/`)**: Aggregated metrics including per-sample mean maximum GP (`per_sample_maxgp.csv.gz`), imputation yield by $R^2$ threshold (`imputation_yield.csv.gz`), and empirical call rates (`call_rate_by_ancestry.csv.gz`).
+
+---
+
+## Copy Number Variation (CNV) Data
+
+HBCD provides copy number variation (CNV) calls derived directly from microarray intensity data (Log R Ratio and B Allele Frequency). Because HBCD does not generate whole-genome sequencing (WGS) data, all structural and copy number variant analyses are sourced from microarray intensity derivatives.
+
+### Processing & De-Identification
+1. **De-Identification**: External CNV calls containing raw PSCIDs are mapped to standardized HBCD release candidate IDs (`release_candid` + `C`/`M`) to ensure participant privacy. Bookmark metrics are verified and retained in de-identified format.
+2. **Release Whitelist Filtering**: CNV segment calls and summary metrics are filtered against `keep_list.txt` to remove excluded or QC-failed subjects.
+3. **Genomic Profile QC**: Rolling median smoothing ($k = 51$ markers) of Log R Ratio, BAF, and CNV values is evaluated across chromosomes and stratified by ancestry and participant type to monitor data stability and flag potential artifacts.
+
+### Deliverables & File Formats
+- **CNV Slim Calls (`genotype_microarray/cnv/CNV_slim.txt`)**: Tab-delimited file containing de-identified, release-filtered segment-level CNV calls.
+- **CNV Bookmark Metrics (`genotype_microarray/cnv/CNV_bookmarks.csv`)**: Comma-delimited file providing summary CNV quality scores and bookmark metrics per sample.

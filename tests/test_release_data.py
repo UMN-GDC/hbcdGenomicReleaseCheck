@@ -25,6 +25,9 @@ GDA_DIR = RELEASE_DIR / "GDA"
 GENESIS_DIR = RELEASE_DIR / "genesis"
 CNV_DIR = RELEASE_DIR / "cnv"
 IMPUTED_DIR = RELEASE_DIR / "imputed"
+IMPUTATION_DIR = Path(
+    os.environ.get("HBCD_IMPUTATION_DIR", "/projects/standard/basu_hbcd/shared/hbcdSandboxData")
+) / "imputed"
 NAME = "hbcd_rsid_harmonized"
 
 # ── helpers ──────────────────────────────────────────────────────────────
@@ -707,10 +710,54 @@ def test_release_tree_completeness():
             expected.add(vcf)
             expected.add(Path(f"{vcf}.tbi"))
 
+    # imputed/ — imputation QC statistics files (batch1-3 prefix)
+    for i in (1, 2, 3):
+        for f in ("snps-typed-only.txt", "snps-excluded.txt",
+                   "chunks-excluded.txt", "quality-control.html"):
+            expected.add(IMPUTED_DIR / f"batch{i}-{f}")
+
     missing = sorted(p for p in expected if not p.exists())
     assert not missing, (
         "Missing expected release file(s):\n" + "\n".join(f"  - {p}" for p in missing)
     )
+
+
+def test_imputation_qc_files_content():
+    """Imputation QC statistics files in the release dir contain data.
+
+    Verifies that the batch-prefixed files copied by step 27 are not
+    empty and have the expected structure (e.g. snps-typed-only.txt has
+    a CHROM column, snps-excluded.txt has an INFO column).
+    """
+    if not IMPUTED_DIR.exists():
+        pytest.skip(f"imputed dir not found: {IMPUTED_DIR}")
+
+    for i in (1, 2, 3):
+        typed_path = IMPUTED_DIR / f"batch{i}-snps-typed-only.txt"
+        if not typed_path.exists():
+            pytest.skip(f"batch{i}-snps-typed-only.txt not found — step 27 may not have run")
+            continue
+        df = pd.read_csv(typed_path, sep=r"\s+")
+        assert "CHROM" in df.columns, (
+            f"batch{i}-snps-typed-only.txt missing CHROM column: {df.columns.tolist()}"
+        )
+        assert len(df) > 0, f"batch{i}-snps-typed-only.txt is empty"
+
+        excl_path = IMPUTED_DIR / f"batch{i}-snps-excluded.txt"
+        if excl_path.exists():
+            df_excl = pd.read_csv(excl_path, sep=r"\s+")
+            assert "INFO" in df_excl.columns, (
+                f"batch{i}-snps-excluded.txt missing INFO column: {df_excl.columns.tolist()}"
+            )
+
+        chunks_path = IMPUTED_DIR / f"batch{i}-chunks-excluded.txt"
+        if chunks_path.exists():
+            df_chunks = pd.read_csv(chunks_path, sep=r"\s+")
+            assert len(df_chunks) > 0, f"batch{i}-chunks-excluded.txt is empty"
+
+        qc_path = IMPUTED_DIR / f"batch{i}-quality-control.html"
+        if qc_path.exists():
+            assert qc_path.stat().st_size > 0, f"batch{i}-quality-control.html is empty"
 
 
 def test_imputed_vcf_genotype_concordance():
