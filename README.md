@@ -21,7 +21,7 @@ module load R/4.4.2-openblas-rocky8
 
 # Conda env
 source ~/miniconda3/etc/profile.d/conda.sh
-conda activate gdcPipeline
+conda activate /projects/standard/gdc/public/envs/gdcPipeline
 
 # Release config (adjust for your release)
 export HBCD_RELEASE=br31p2
