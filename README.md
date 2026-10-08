@@ -19,6 +19,9 @@ module load plink/2.00-alpha-091019
 module load bcftools
 module load R/4.4.2-openblas-rocky8
 
+# Python virtual env (for pipeline Python scripts)
+source /projects/standard/basu_hbcd/shared/.venv/bin/activate
+
 # Conda env — activate with FULL PATH before running pipeline
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate /projects/standard/gdc/public/envs/gdcPipeline

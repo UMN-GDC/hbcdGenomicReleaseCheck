@@ -37,13 +37,22 @@ echo "  Data dir    : $HBCD_DATA_DIR"
 echo "  Imputation  : $HBCD_IMPUTATION_DIR"
 echo "=========================================="
 
-# ── Conda: users must activate environment before running ────────────────
+# ── Environment: source .venv + activate conda ───────────────────────────
+#   source /projects/standard/basu_hbcd/shared/.venv/bin/activate
 #   source ~/miniconda3/etc/profile.d/conda.sh
 #   conda activate /projects/standard/gdc/public/envs/gdcPipeline
 # Then run steps directly:
 #   python 25-filterGenotypeFiles.py
 #   ./26-run_plink_filter.sh
 #   ...
+
+# Verify .venv is active
+if [[ -z "${VIRTUAL_ENV:-}" ]] || [[ "$VIRTUAL_ENV" != "/projects/standard/basu_hbcd/shared/.venv" ]]; then
+    echo "ERROR: .venv at /projects/standard/basu_hbcd/shared/.venv not activated."
+    echo "Run before executing this script:"
+    echo "  source /projects/standard/basu_hbcd/shared/.venv/bin/activate"
+    exit 1
+fi
 
 # Verify conda env is active (checks CONDA_PREFIX for path-based activation)
 if [[ -z "${CONDA_PREFIX:-}" ]] || [[ "$CONDA_PREFIX" != "/projects/standard/gdc/public/envs/gdcPipeline" ]]; then
