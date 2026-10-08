@@ -1,11 +1,49 @@
 #!/usr/bin/env python3
+"""
+Step 28: CNV De-identification (pscid → release_candid)
 
-# step 28: de-identify CNV_slim_clean.txt — map pscid → release_candid
-# Writes de-identified CNV to release_base for downstream filtering.
-# CNV sample_id format:  ..._<pscid><C|M>
-#   e.g.  "GSM0000000_Grn_12345C" → pscid=12345, type=C
-#
-# Usage: python 28-cnv-deid.py
+De-identifies CNV call files by mapping PSCIDs to anonymous release_candid integers.
+This is the ONLY de-identification step in Phase C — all other derivatives are
+already de-identified by Phase B.
+
+Pipeline Phase: C (Release Filtering & Validation)
+Input Source: data_handoff/ (external CNV pipeline outputs, still pscid-based)
+
+Inputs:
+    - $HBCD_DATA_DIR/data_handoff/CNV_slim_clean.txt: CNV calls with pscid IIDs
+      Format: sample_id = {array}_{channel}_{pscid}{C|M} (e.g., GSM0000000_Grn_12345C)
+    - $HBCD_DATA_DIR/data_handoff/HBCD_CNV_bookmark_metrics_clean.csv: CNV bookmarks
+      Already de-identified (sample_id = {release_candid}{C|M})
+    - $HBCD_DATA_DIR/release_identifiers_20260628.csv: PSCID -> release_candid crosswalk
+
+Outputs (to $RELEASE_BASE/staging/cnv/):
+    - CNV_slim_deid.txt: De-identified CNV calls (all QC subjects, NO filtering)
+    - CNV_bookmarks_deid.csv: Copied bookmarks (already de-identified)
+
+Processing:
+    1. CNV Slim Clean:
+       - Extract pscid + relationship (C/M) from sample_id
+       - Map pscid -> release_candid via crosswalk
+       - Build de-identified IID: {release_candid}{C|M}
+       - Drop unmapped pscids
+       - Write all rows (no filtering - step 29 handles release filtering)
+    2. CNV Bookmarks:
+       - Already de-identified, copy as-is
+
+Note: This step does NOT filter to release subjects. Step 29 applies the
+keep_list.txt filter to both files.
+
+Usage:
+    python 28-cnv-deid.py
+
+Environment Variables:
+    HBCD_RELEASE: Release tag (default: br_21p3)
+    HBCD_DATA_DIR: Base data directory (default: /projects/standard/basu_hbcd/shared/data)
+
+Example:
+    export HBCD_RELEASE=br31p2
+    python 28-cnv-deid.py
+"""
 
 import sys
 from pathlib import Path

@@ -1,9 +1,53 @@
 #!/usr/bin/env python3
+"""
+Step 30: Validate Exclusion Integrity — Final Quality Gate
 
-# step 30: validate no excluded subjects appear in any release output file
-# Checks GDA/merged_chroms.fam + all derivative files + CNV for excluded-IID contamination.
-#
-# Usage: python 30-validateExclusions.py [--release-dir /path]
+Validates that NO excluded subject appears in ANY release output file.
+This is the final quality gate before release sign-off.
+
+Pipeline Phase: C (Release Filtering & Validation) — MUST RUN LAST
+Prerequisites: Steps 25-29 complete (all release outputs exist)
+
+Exclusion Sources (3 independent mechanisms):
+    1. HBCDexclusions.csv — PSCID-level, multi-column reasons
+       Mapped to release_candid via identifiers crosswalk
+    2. Excel Exclude_Summary — release_candid-level (direct)
+    3. GDA/removed_individuals.txt — IID-level (pipeline-generated)
+
+Checks Performed:
+    1. GDA/merged_chroms.fam — FID (release_candid) + IID level
+    2. HBCDexclusions.csv — Per-column check (no single reason leaks)
+    3. Derivative files (IID-level):
+       - genesis/pcrelate_relatedness.grm.id
+       - genesis/pcair_weights.tsv (subject_id)
+       - genesis/pcrelate_relatedness.tsv (ID1, ID2)
+       - genesis/pcrelate_relatedness.grm.gz (via .id index mapping)
+       - cnv/CNV_slim.txt (sample_id)
+       - cnv/CNV_bookmarks.csv (sample_id)
+    4. Cross-check: Warns of IIDs neither in release set nor excluded
+
+Outputs:
+    - Console: Formatted validation report with OK/OVERLAP per check
+    - Log file: $RELEASE_BASE/log_30_validateExclusions_YYYYMMDD_HHMMSS.txt
+
+Usage:
+    python 30-validateExclusions.py [--release-dir /path]
+
+Arguments:
+    --release-dir, -r: Override release directory (default: from HBCD_RELEASE)
+
+Environment Variables:
+    HBCD_RELEASE: Release tag (default: br_21p3)
+    HBCD_DATA_DIR: Base data directory (default: /projects/standard/basu_hbcd/shared/data)
+
+Example:
+    export HBCD_RELEASE=br31p2
+    python 30-validateExclusions.py
+
+Exit Codes:
+    0: All checks OK (no overlaps)
+    1: Any overlap detected (check logs)
+"""
 
 import sys
 from pathlib import Path

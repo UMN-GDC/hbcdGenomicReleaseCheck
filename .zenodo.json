@@ -1,0 +1,90 @@
+{
+  "title": "HBCD Genomic Release Pipeline",
+  "description": "Comprehensive pipeline for de-identification, filtering, and validation of genomic data for the HEALthy Brain and Child Development (HBCD) Study data releases. Transforms raw genomic data (PLINK format, imputed VCFs, CNV calls) into release-ready derivatives that comply with HBCD data standards and participant privacy requirements.",
+  "version": "0.1.0",
+  "creators": [
+    {
+      "name": "HBCD Genomics Team",
+      "affiliation": "University of Minnesota",
+      "orcid": "0000-0000-0000-0000"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "HBCD Data Coordinating Center",
+      "affiliation": "University of Minnesota",
+      "type": "ProjectManagement"
+    },
+    {
+      "name": "HBCD Genomics Workgroup",
+      "affiliation": "Multi-institutional",
+      "type": "ResearchGroup"
+    }
+  ],
+  "license": "Apache-2.0",
+  "keywords": [
+    "genomics",
+    "hbcd",
+    "de-identification",
+    "plink",
+    "vcf",
+    "cnv",
+    "imputation",
+    "topmed",
+    "data-release",
+    "grm",
+    "pc-air",
+    "pc-relate",
+    "pedigree"
+  ],
+  "related_identifiers": [
+    {
+      "relation": "isDocumentedBy",
+      "identifier": "https://hbcd-genomic-release.readthedocs.io/",
+      "resource_type": "publication"
+    },
+    {
+      "relation": "isSupplementTo",
+      "identifier": "https://docs.hbcdstudy.org/",
+      "resource_type": "publication"
+    },
+    {
+      "relation": "references",
+      "identifier": "https://www.nmind.org/",
+      "resource_type": "publication"
+    }
+  ],
+  "funding_references": [
+    {
+      "funder_name": "National Institutes of Health",
+      "funder_identifier": "https://doi.org/10.13039/100000002",
+      "award_number": "U01DA055368",
+      "award_title": "HEALthy Brain and Child Development Study"
+    },
+    {
+      "funder_name": "National Institutes of Health",
+      "funder_identifier": "https://doi.org/10.13039/100000002",
+      "award_number": "U24DA055367",
+      "award_title": "HBCD Data Coordinating Center"
+    }
+  ],
+  "references": [
+    "Kiar, G., et al. (2023). NMIND: Community-driven standards for reproducible neuroimaging. Nature Human Behaviour, 7(12), 2005-2015. https://doi.org/10.1038/s41562-023-01647-0",
+    "Gorgolewski, K.J., et al. (2017). BIDS apps: Improving ease of use, accessibility, and reproducibility of neuroimaging data processing methods. PLoS Computational Biology, 13(3), e1005209. https://doi.org/10.1371/journal.pcbi.1005209"
+  ],
+  "communities": [
+    {
+      "identifier": "hbcd"
+    },
+    {
+      "identifier": "nmind"
+    }
+  ],
+  "publication_date": "2024-01-15",
+  "resource_type": {
+    "type": "software",
+    "title": "Software"
+  },
+  "access_right": "open",
+  "upload_type": "software"
+}

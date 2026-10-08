@@ -1,7 +1,53 @@
 #!/usr/bin/env python3
+"""
+Step 25: Genotype De-identification & Filtering for HBCD Release
 
-# step 25: filter batch and genomics data for the HBCD release
-# source /projects/standard/basu_hbcd/shared/.venv/bin/activate
+This script performs the core de-identification and filtering logic for the HBCD
+genomic release pipeline. It builds the release subject whitelist (keep_list.txt)
+and creates a de-identified temp.fam file that preserves the original PLINK .bed
+row count for compatibility with PLINK2 --fam.
+
+Pipeline Phase: C (Release Filtering & Validation)
+Dependencies: Phase A (QC & derivatives) + Phase B (de-identification) complete
+
+Inputs (via _lib.py):
+    - $HBCD_DATA_DIR/onlyQc.fam: De-identified PLINK .fam from Phase B
+    - $HBCD_DATA_DIR/batch.info: Batch metadata (IID={pscid}{C|M})
+    - $HBCD_DATA_DIR/release_identifiers_20260628.csv: PSCID -> release_candid crosswalk
+    - $HBCD_DATA_DIR/HBCDexclusions.csv: Additional PSCID exclusions (multi-column)
+    - $HBCD_DATA_DIR/HBCD_genetics_QC1_missing_race_LORIS.xlsx: Excel exclusions (Exclude_Summary)
+    - $HBCD_DATA_DIR/par_visit_data_br21_1.tsv: par_visit participation data
+
+Outputs (to $RELEASE_BASE/ and $RELEASE_DIR/GDA/):
+    - temp.fam: ALL QC subjects with de-identified FID/IID (preserves .bed row count)
+    - keep_list.txt: Release whitelist (FID + IID for valid subjects)
+    - GDA/batch.info: Batch metadata for release subjects (IID, visit, plate_number)
+    - GDA/removed_individuals.txt: Excluded IIDs for documentation
+
+Filter Logic:
+    1. Load identifiers, apply HBCDexclusions.csv PSCID filter
+    2. Map batch.info IIDs (pscid -> release_candid)
+    3. Load onlyQc.fam (already de-identified by Phase B)
+    4. Merge: fam x identifiers x batch_info
+    5. Relationship filter: keep batch row matching original C/M suffix
+    6. Two-stage inclusive filter:
+       - Stage 1: par_visit subjects only (completed visits)
+       - Stage 2: Remove Excel Exclude_Summary release_candids
+    7. Require non-missing visit + plate_number metadata
+    8. Deduplicate by IID (keep first)
+
+Usage:
+    python 25-filterGenotypeFiles.py
+
+Environment Variables:
+    HBCD_RELEASE: Release tag (default: br_21p3)
+    HBCD_DATA_DIR: Base data directory (default: /projects/standard/basu_hbcd/shared/data)
+
+Example:
+    export HBCD_RELEASE=br31p2
+    export HBCD_DATA_DIR=/projects/standard/basu_hbcd/shared/data
+    python 25-filterGenotypeFiles.py
+"""
 
 import pandas as pd
 

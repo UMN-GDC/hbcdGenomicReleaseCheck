@@ -1,18 +1,58 @@
 #!/usr/bin/env python3
+"""
+Step 29: Filter All De-identified Handoff Derivatives to Release Subjects
 
-# step 29: filter all de-identified handoff derivatives to release subjects
-# Reads keep_list.txt (release IIDs) + de-IDed CNV, writes filtered copies
-# to genotype_microarray subdirectories (genesis/, cnv/).
-#
-# Filtered outputs:
-#   - PC-Relate GRM (binary)  →  genesis/pcrelate_relatedness.grm.{id,bin,N.bin}
-#   - PC-Relate GRM (text gz) →  genesis/pcrelate_relatedness.grm.gz
-#   - PC-Relate GRM pairwise  →  genesis/pcrelate_relatedness.tsv
-#   - PC-AiR 32 PCs clean     →  genesis/pcair_weights.tsv
-#   - CNV slim clean          →  cnv/CNV_slim.txt
-#
-# Usage: python 29-filter_release_outputs.py [--release-dir /path]
-# Default release from HBCD_RELEASE env var or br_21p3.
+Reads keep_list.txt (release IID whitelist) and filters all de-identified
+derivative files from data_handoff/ and staging/cnv/ to the release subject set.
+Writes filtered copies to the release directory (genesis/, cnv/).
+
+Pipeline Phase: C (Release Filtering & Validation)
+Prerequisites: Steps 25-28 complete (keep_list.txt exists, CNV de-identified)
+
+Inputs:
+    - $RELEASE_BASE/keep_list.txt: Release IID whitelist (FID + IID)
+    - $HBCD_DATA_DIR/data_handoff/:
+        - hbcd_pcrelate_grm.grm.{id,bin,N.bin}: Binary GRM (de-identified by Phase B)
+        - hbcd_pcrelate_grm.grm.gz: Text GRM (de-identified by Phase B)
+        - hbcd_pcrelate_grm_pairwise.tsv: Pairwise relatedness (de-identified by Phase B)
+        - hbcd_pcair_32PCs_clean.tsv: PC-AiR weights (de-identified by Phase B)
+    - $RELEASE_BASE/staging/cnv/ (from step 28):
+        - CNV_slim_deid.txt: De-identified CNV calls
+        - CNV_bookmarks_deid.csv: De-identified CNV bookmarks
+
+Outputs (to $RELEASE_DIR/):
+    - genesis/pcrelate_relatedness.grm.{id,bin,N.bin}: Filtered binary GRM
+    - genesis/pcrelate_relatedness.grm.gz: Filtered text GRM (gzipped)
+    - genesis/pcrelate_relatedness.tsv: Filtered pairwise relatedness
+    - genesis/pcair_weights.tsv: Filtered PC-AiR weights
+    - cnv/CNV_slim.txt: Filtered CNV calls
+    - cnv/CNV_bookmarks.csv: Filtered CNV bookmarks
+
+Filtering Methods:
+    - Binary GRM: Subset .id, .bin, .N.bin using index mapping
+    - Text GRM (.gz): Map 1-based indices via .grm.id, filter row pairs
+    - Pairwise TSV: Filter rows where both ID1 and ID2 in release_iids
+    - PC-AiR TSV: Filter rows where subject_id in release_iids
+    - CNV TSV/CSV: Filter rows where sample_id in release_iids
+
+Cross-form Validation:
+    - Compares CNV vs Bookmarks IID sets
+    - Warns of IIDs in derivatives not in release set
+
+Usage:
+    python 29-filter_release_outputs.py [--release-dir /path]
+
+Arguments:
+    --release-dir, -r: Override release directory (default: from HBCD_RELEASE env)
+
+Environment Variables:
+    HBCD_RELEASE: Release tag (default: br_21p3)
+    HBCD_DATA_DIR: Base data directory (default: /projects/standard/basu_hbcd/shared/data)
+
+Example:
+    export HBCD_RELEASE=br31p2
+    python 29-filter_release_outputs.py
+"""
 
 import sys
 import pandas as pd

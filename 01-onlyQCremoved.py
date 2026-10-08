@@ -1,7 +1,43 @@
 #!/usr/bin/env python3
+"""
+Step 01: QC Removal — Map HBCD.fam IIDs to release_candid, Produce QC_removed.txt
 
-# step 1: remap HBCD.fam IIDs from raw format to release_candid-based IIDs
-# source /projects/standard/basu_hbcd/shared/.venv/bin/activate
+Maps raw HBCD genotype IIDs to anonymous release_candid identifiers and identifies
+QC failures + control subjects for removal. This is the first step of Phase A.
+
+Pipeline Phase: A (QC & Derivative Computation) — Run FIRST
+Prerequisites: Raw HBCD transfer data, identifiers crosswalk, QC Excel
+
+Inputs:
+    - $HBCD_DATA_DIR/../HST_HBCD_Transfer_July2025/HBCD/HBCD.fam: Raw PLINK .fam
+      IID format: {prefix}_{pscid}{C|M} (pscid extracted as 9-char substring)
+    - $HBCD_DATA_DIR/release_identifiers_20260628.csv: PSCID -> release_candid crosswalk
+    - $HBCD_DATA_DIR/HBCD_genetics_QC1_missing_race_LORIS.xlsx: QC exclusions (Exclude_Summary)
+
+Outputs (to $HBCD_DATA_DIR/):
+    - HBCD_remapped.fam: Remapped .fam with release_candid-based FID/IID
+    - QC_removed.txt: PSCIDs to remove (QC failures from Excel)
+    - Removed_controls.txt: Control subject IIDs (non-standard IID format)
+
+Processing:
+    1. Load HBCD.fam, extract pscid (9 chars) + relationship (C/M) from IID
+    2. Merge with identifiers crosswalk (pscid -> release_candid)
+    3. Assign FID = release_candid (or negative for unmapped), IID = FID + rel
+    4. Disambiguate duplicate IIDs with _1, _2 suffixes
+    5. Identify controls: IIDs not matching ^\d{10}[CM]$ pattern
+    6. Load QC Excel, extract Study_ID -> pscid + rel, map to release_candid
+    7. Write QC_removed.txt (QC failures) and Removed_controls.txt
+
+Usage:
+    python 01-onlyQCremoved.py
+
+Environment Variables:
+    HBCD_DATA_DIR: Base data directory (default: /projects/standard/basu_hbcd/shared/data)
+
+Example:
+    export HBCD_DATA_DIR=/projects/standard/basu_hbcd/shared/data
+    python 01-onlyQCremoved.py
+"""
 
 import re
 from pathlib import Path
