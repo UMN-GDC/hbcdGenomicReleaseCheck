@@ -32,10 +32,11 @@ source /etc/profile.d/modules.sh
 # Python virtual env
 source /projects/standard/basu_hbcd/shared/.venv/bin/activate
 
-# Conda env - use conda run to avoid activate script issues
-CONDA_EXE="/projects/standard/gdc/public/envs/gdcPipeline/bin/conda"
-CONDA_ENV="/projects/standard/gdc/public/envs/gdcPipeline"
-CONDA_RUN="$CONDA_EXE run -p $CONDA_ENV"
+# Conda - source from home, then use conda run for commands
+source ~/miniconda3/etc/profile.d/conda.sh
+
+# Use conda run with named env to avoid activate script issues
+CONDA_RUN="conda run -n gdcPipeline"
 
 # ── User-configurable variables (EDIT THESE before submitting) ────────────
 HBCD_RELEASE="br31p2"
