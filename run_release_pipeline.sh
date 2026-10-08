@@ -26,22 +26,25 @@
 set -euo pipefail
 
 # ── Initialize environment for SLURM batch ───────────────────────────────
-# Source profile for modules and conda
+# Source profile for modules
 source /etc/profile.d/modules.sh
-source ~/miniconda3/etc/profile.d/conda.sh
 
-# Activate environments
+# Python virtual env
 source /projects/standard/basu_hbcd/shared/.venv/bin/activate
-conda activate /projects/standard/gdc/public/envs/gdcPipeline
+
+# Conda env - use conda run to avoid activate script issues
+CONDA_EXE="/projects/standard/gdc/public/envs/gdcPipeline/bin/conda"
+CONDA_ENV="/projects/standard/gdc/public/envs/gdcPipeline"
+CONDA_RUN="$CONDA_EXE run -p $CONDA_ENV"
 
 # ── User-configurable variables (EDIT THESE before submitting) ────────────
 HBCD_RELEASE="br31p2"
 HBCD_DATA_DIR="/projects/standard/basu_hbcd/shared/data"
 HBCD_IMPUTATION_DIR="/projects/standard/basu_hbcd/shared/hbcdSandboxData"
 
-# Input file paths (update filenames per release)
-HBCD_IDENTIFIERS_FILE="${HBCD_DATA_DIR}/release_identifiers_20261201.csv"
-HBCD_PAR_VISIT_FILE="${HBCD_DATA_DIR}/par_visit_data_br31_2.tsv"
+# Input file paths (original filenames)
+HBCD_IDENTIFIERS_FILE="${HBCD_DATA_DIR}/release_identifiers_20260628.csv"
+HBCD_PAR_VISIT_FILE="${HBCD_DATA_DIR}/par_visit_data_br21_1.tsv"
 
 # Derived paths (do not edit)
 RELEASE_DIR="$(dirname "$HBCD_DATA_DIR")/HBCD_genomics_release_${HBCD_RELEASE}/genotype_microarray"
@@ -62,7 +65,7 @@ echo "=========================================="
 # ── Step 25: De-ID + Filter genotypes ───────────────────────────
 echo ""
 echo "=== Step 25: De-ID + Filter genotypes ==="
-python 25-filterGenotypeFiles.py
+$CONDA_RUN python 25-filterGenotypeFiles.py
 
 # ── Step 26: PLINK2 --keep → GDA/merged_chroms ─────────────────
 echo ""
@@ -86,17 +89,17 @@ echo "  Job $JOB_ID complete."
 # ── Step 28: De-identify CNV calls ──────────────────────────────
 echo ""
 echo "=== Step 28: De-identify CNV ==="
-python 28-cnv-deid.py
+$CONDA_RUN python 28-cnv-deid.py
 
 # ── Step 29: Filter all handoff derivatives to release subjects ─
 echo ""
 echo "=== Step 29: Filter handoff derivatives ==="
-python 29-filter_release_outputs.py
+$CONDA_RUN python 29-filter_release_outputs.py
 
 # ── Step 30: Validate exclusion integrity ───────────────────────
 echo ""
 echo "=== Step 30: Validate exclusions ==="
-python 30-validateExclusions.py
+$CONDA_RUN python 30-validateExclusions.py
 
 echo ""
 echo "=========================================="
