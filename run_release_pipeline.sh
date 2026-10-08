@@ -37,16 +37,33 @@ echo "  Data dir    : $HBCD_DATA_DIR"
 echo "  Imputation  : $HBCD_IMPUTATION_DIR"
 echo "=========================================="
 
-# ── Conda runner (hardcoded paths, avoids activate/deactivate bug) ────
-# Use the conda from the pipeline env itself (has correct shebang)
-CONDA_EXE="/projects/standard/gdc/public/envs/gdcPipeline/bin/conda"
-CONDA_ENV="/projects/standard/gdc/public/envs/gdcPipeline"
-CONDA_RUN="$CONDA_EXE run -p $CONDA_ENV"
+# ── Conda: users must activate environment before running ────────────────
+#   source ~/miniconda3/etc/profile.d/conda.sh
+#   conda activate gdcPipeline
+# Or use the shared env:
+#   source /projects/standard/gdc/public/envs/gdcPipeline/etc/profile.d/conda.sh
+#   conda activate gdcPipeline
+# Then run steps directly (no wrapper needed for conda):
+#   python 25-filterGenotypeFiles.py
+#   ./26-run_plink_filter.sh
+#   ...
+
+# Verify conda env is active
+if [[ -z "${CONDA_DEFAULT_ENV:-}" ]] || [[ "$CONDA_DEFAULT_ENV" != "gdcPipeline" ]]; then
+    echo "ERROR: conda environment 'gdcPipeline' not activated."
+    echo "Run before executing this script:"
+    echo "  source ~/miniconda3/etc/profile.d/conda.sh"
+    echo "  conda activate gdcPipeline"
+    echo "Or for shared env:"
+    echo "  source /projects/standard/gdc/public/envs/gdcPipeline/etc/profile.d/conda.sh"
+    echo "  conda activate gdcPipeline"
+    exit 1
+fi
 
 # ── Step 25: De-ID + Filter genotypes ───────────────────────────
 echo ""
 echo "=== Step 25: De-ID + Filter genotypes ==="
-$CONDA_RUN python 25-filterGenotypeFiles.py
+python 25-filterGenotypeFiles.py
 
 # ── Step 26: PLINK2 --keep → GDA/merged_chroms ─────────────────
 echo ""
@@ -70,17 +87,17 @@ echo "  Job $JOB_ID complete."
 # ── Step 28: De-identify CNV calls ──────────────────────────────
 echo ""
 echo "=== Step 28: De-identify CNV ==="
-$CONDA_RUN python 28-cnv-deid.py
+python 28-cnv-deid.py
 
 # ── Step 29: Filter all handoff derivatives to release subjects ─
 echo ""
 echo "=== Step 29: Filter handoff derivatives ==="
-$CONDA_RUN python 29-filter_release_outputs.py
+python 29-filter_release_outputs.py
 
 # ── Step 30: Validate exclusion integrity ───────────────────────
 echo ""
 echo "=== Step 30: Validate exclusions ==="
-$CONDA_RUN python 30-validateExclusions.py
+python 30-validateExclusions.py
 
 echo ""
 echo "=========================================="
