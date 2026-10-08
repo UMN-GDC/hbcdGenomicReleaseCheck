@@ -19,14 +19,17 @@ module load plink/2.00-alpha-091019
 module load bcftools
 module load R/4.4.2-openblas-rocky8
 
-# Conda env
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate /projects/standard/gdc/public/envs/gdcPipeline
+# Conda env (run_release_pipeline.sh uses conda run internally)
+# conda activate /projects/standard/gdc/public/envs/gdcPipeline
 
 # Release config (adjust for your release)
 export HBCD_RELEASE=br31p2
 export HBCD_DATA_DIR=/projects/standard/basu_hbcd/shared/data
 export HBCD_IMPUTATION_DIR=/projects/standard/basu_hbcd/shared/hbcdSandboxData
+
+# Input file overrides (place updated files in HBCD_DATA_DIR)
+export HBCD_IDENTIFIERS_FILE=$HBCD_DATA_DIR/release_identifiers_20261201.csv
+export HBCD_PAR_VISIT_FILE=$HBCD_DATA_DIR/par_visit_data_br31_2.tsv
 ```
 
 ### Automated (Recommended)
