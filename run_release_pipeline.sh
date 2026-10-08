@@ -34,17 +34,21 @@ source ~/miniconda3/etc/profile.d/conda.sh
 source /projects/standard/basu_hbcd/shared/.venv/bin/activate
 conda activate /projects/standard/gdc/public/envs/gdcPipeline
 
-# ── defaults ────────────────────────────────────────────────────
-: "${HBCD_RELEASE:=br_21p3}"
-: "${HBCD_DATA_DIR:=/projects/standard/basu_hbcd/shared/data}"
-: "${HBCD_IMPUTATION_DIR:=/projects/standard/basu_hbcd/shared/hbcdSandboxData}"
-: "${RELEASE_DIR:=$(dirname "$HBCD_DATA_DIR")/HBCD_genomics_release_${HBCD_RELEASE}/genotype_microarray}"
+# ── User-configurable variables (EDIT THESE before submitting) ────────────
+HBCD_RELEASE="br31p2"
+HBCD_DATA_DIR="/projects/standard/basu_hbcd/shared/data"
+HBCD_IMPUTATION_DIR="/projects/standard/basu_hbcd/shared/hbcdSandboxData"
 
+# Input file paths (update filenames per release)
+HBCD_IDENTIFIERS_FILE="${HBCD_DATA_DIR}/release_identifiers_20261201.csv"
+HBCD_PAR_VISIT_FILE="${HBCD_DATA_DIR}/par_visit_data_br31_2.tsv"
+
+# Derived paths (do not edit)
+RELEASE_DIR="$(dirname "$HBCD_DATA_DIR")/HBCD_genomics_release_${HBCD_RELEASE}/genotype_microarray"
 RELEASE_BASE="$(dirname "$RELEASE_DIR")"
 
-# Exported paths for downstream scripts / manual steps
-export HBCD_IDENTIFIERS_FILE="${HBCD_DATA_DIR}/release_identifiers_20260628.csv"
-export HBCD_PAR_VISIT_FILE="${HBCD_DATA_DIR}/par_visit_data_br21_1.tsv"
+# Export for downstream scripts
+export HBCD_RELEASE HBCD_DATA_DIR HBCD_IMPUTATION_DIR HBCD_IDENTIFIERS_FILE HBCD_PAR_VISIT_FILE RELEASE_DIR RELEASE_BASE
 
 echo "=========================================="
 echo "  HBCD Release Pipeline"

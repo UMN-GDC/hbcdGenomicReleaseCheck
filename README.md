@@ -13,40 +13,39 @@
 > **Prerequisites**: Phases A & B complete (see [docs](https://hbcd-genomic-release.readthedocs.io/en/latest/running.html#phase-a-qc-derivative-computation))
 
 ### Environment Setup
-best to run this in an srun
+
+The pipeline runs as a **SLURM batch job** (12hr, 8GB). The wrapper script handles environment activation internally.
+
+**Edit `run_release_pipeline.sh` first** — set your release config at the top:
+
 ```bash
-srun --mem=8gb --time=8:00:00 --pty bash
-```
+# User-configurable variables (EDIT THESE before submitting)
+HBCD_RELEASE="br31p2"
+HBCD_DATA_DIR="/projects/standard/basu_hbcd/shared/data"
+HBCD_IMPUTATION_DIR="/projects/standard/basu_hbcd/shared/hbcdSandboxData"
 
-
-```bash
-# MSI modules
-module load plink/2.00-alpha-091019
-module load bcftools
-module load R/4.4.2-openblas-rocky8
-
-# Python virtual env (for pipeline Python scripts)
-source /projects/standard/basu_hbcd/shared/.venv/bin/activate
-
-# Conda env — activate with FULL PATH before running pipeline
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate /projects/standard/gdc/public/envs/gdcPipeline
-
-# Release config (adjust for your release)
-export HBCD_RELEASE=br31p2
-export HBCD_DATA_DIR=/projects/standard/basu_hbcd/shared/data
-export HBCD_IMPUTATION_DIR=/projects/standard/basu_hbcd/shared/hbcdSandboxData
-
-# Input file overrides (place updated files in HBCD_DATA_DIR)
-export HBCD_IDENTIFIERS_FILE=$HBCD_DATA_DIR/release_identifiers_20261201.csv
-export HBCD_PAR_VISIT_FILE=$HBCD_DATA_DIR/par_visit_data_br31_2.tsv
+# Input file paths (update filenames per release)
+HBCD_IDENTIFIERS_FILE="${HBCD_DATA_DIR}/release_identifiers_20261201.csv"
+HBCD_PAR_VISIT_FILE="${HBCD_DATA_DIR}/par_visit_data_br31_2.tsv"
 ```
 
 ### Automated (Recommended)
+
 ```bash
-./run_release_pipeline.sh
+# Submit as SLURM batch job (runs steps 25→30, including step 27 array)
+sbatch run_release_pipeline.sh
 ```
-Runs steps 25→30 with SLURM monitoring.
+
+The script:
+1. Initializes environment (modules, .venv, conda) for SLURM batch
+2. Runs step 25 (de-ID + filter genotypes)
+3. Runs step 26 (PLINK2 --keep)
+4. Submits step 27 (SLURM array, 24 tasks) and polls until complete
+5. Runs step 28 (CNV de-identification)
+6. Runs step 29 (filter all derivatives)
+7. Runs step 30 (validate exclusions)
+
+Output/error logs: `/projects/standard/basu_hbcd/shared/HBCD_genomics_release_hbcd_release_pipeline_<jobid>.out/.err`
 
 ### Manual Step-by-Step
 ```bash
