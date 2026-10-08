@@ -1,13 +1,21 @@
 #!/bin/bash
+#SBATCH --job-name=hbcd_release_pipeline
+#SBATCH --time=12:00:00
+#SBATCH --mem=8G
+#SBATCH --cpus-per-task=1
+#SBATCH --partition=msismall
+#SBATCH --output=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_%x_%j.out
+#SBATCH --error=/projects/standard/basu_hbcd/shared/HBCD_genomics_release_%x_%j.err
+
 # run_release_pipeline.sh — Create the full HBCD release directory
 # Runs all pipeline steps in order: 25 → 26 → 27 → 28 → 29 → 30.
 #
-# Usage:
+# Usage (as SLURM batch job):
 #   export HBCD_RELEASE=br_21p3
-#   ./run_release_pipeline.sh
+#   sbatch run_release_pipeline.sh
 #
 # Or with explicit release tag:
-#   HBCD_RELEASE=br_21p3 ./run_release_pipeline.sh
+#   HBCD_RELEASE=br_21p3 sbatch run_release_pipeline.sh
 #
 # Env vars:
 #   HBCD_RELEASE         — release tag (default: br_21p3)
@@ -16,6 +24,15 @@
 #   RELEASE_DIR          — override release directory path
 
 set -euo pipefail
+
+# ── Initialize environment for SLURM batch ───────────────────────────────
+# Source profile for modules and conda
+source /etc/profile.d/modules.sh
+source ~/miniconda3/etc/profile.d/conda.sh
+
+# Activate environments
+source /projects/standard/basu_hbcd/shared/.venv/bin/activate
+conda activate /projects/standard/gdc/public/envs/gdcPipeline
 
 # ── defaults ────────────────────────────────────────────────────
 : "${HBCD_RELEASE:=br_21p3}"
@@ -35,33 +52,8 @@ echo "  Release tag : $HBCD_RELEASE"
 echo "  Release dir : $RELEASE_DIR"
 echo "  Data dir    : $HBCD_DATA_DIR"
 echo "  Imputation  : $HBCD_IMPUTATION_DIR"
+echo "  SLURM Job   : ${SLURM_JOB_ID:-local}"
 echo "=========================================="
-
-# ── Environment: source .venv + activate conda ───────────────────────────
-#   source /projects/standard/basu_hbcd/shared/.venv/bin/activate
-#   source ~/miniconda3/etc/profile.d/conda.sh
-#   conda activate /projects/standard/gdc/public/envs/gdcPipeline
-# Then run steps directly:
-#   python 25-filterGenotypeFiles.py
-#   ./26-run_plink_filter.sh
-#   ...
-
-# Verify .venv is active
-if [[ -z "${VIRTUAL_ENV:-}" ]] || [[ "$VIRTUAL_ENV" != "/projects/standard/basu_hbcd/shared/.venv" ]]; then
-    echo "ERROR: .venv at /projects/standard/basu_hbcd/shared/.venv not activated."
-    echo "Run before executing this script:"
-    echo "  source /projects/standard/basu_hbcd/shared/.venv/bin/activate"
-    exit 1
-fi
-
-# Verify conda env is active (checks CONDA_PREFIX for path-based activation)
-if [[ -z "${CONDA_PREFIX:-}" ]] || [[ "$CONDA_PREFIX" != "/projects/standard/gdc/public/envs/gdcPipeline" ]]; then
-    echo "ERROR: conda environment '/projects/standard/gdc/public/envs/gdcPipeline' not activated."
-    echo "Run before executing this script:"
-    echo "  source ~/miniconda3/etc/profile.d/conda.sh"
-    echo "  conda activate /projects/standard/gdc/public/envs/gdcPipeline"
-    exit 1
-fi
 
 # ── Step 25: De-ID + Filter genotypes ───────────────────────────
 echo ""
