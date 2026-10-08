@@ -19,12 +19,9 @@ module load plink/2.00-alpha-091019
 module load bcftools
 module load R/4.4.2-openblas-rocky8
 
-# Conda env — activate BEFORE running pipeline
+# Conda env — activate with FULL PATH before running pipeline
 source ~/miniconda3/etc/profile.d/conda.sh
-conda activate gdcPipeline
-# Or shared env:
-# source /projects/standard/gdc/public/envs/gdcPipeline/etc/profile.d/conda.sh
-# conda activate gdcPipeline
+conda activate /projects/standard/gdc/public/envs/gdcPipeline
 
 # Release config (adjust for your release)
 export HBCD_RELEASE=br31p2

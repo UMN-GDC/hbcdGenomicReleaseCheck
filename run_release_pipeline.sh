@@ -39,24 +39,18 @@ echo "=========================================="
 
 # ── Conda: users must activate environment before running ────────────────
 #   source ~/miniconda3/etc/profile.d/conda.sh
-#   conda activate gdcPipeline
-# Or use the shared env:
-#   source /projects/standard/gdc/public/envs/gdcPipeline/etc/profile.d/conda.sh
-#   conda activate gdcPipeline
-# Then run steps directly (no wrapper needed for conda):
+#   conda activate /projects/standard/gdc/public/envs/gdcPipeline
+# Then run steps directly:
 #   python 25-filterGenotypeFiles.py
 #   ./26-run_plink_filter.sh
 #   ...
 
-# Verify conda env is active
-if [[ -z "${CONDA_DEFAULT_ENV:-}" ]] || [[ "$CONDA_DEFAULT_ENV" != "gdcPipeline" ]]; then
-    echo "ERROR: conda environment 'gdcPipeline' not activated."
+# Verify conda env is active (checks CONDA_PREFIX for path-based activation)
+if [[ -z "${CONDA_PREFIX:-}" ]] || [[ "$CONDA_PREFIX" != "/projects/standard/gdc/public/envs/gdcPipeline" ]]; then
+    echo "ERROR: conda environment '/projects/standard/gdc/public/envs/gdcPipeline' not activated."
     echo "Run before executing this script:"
     echo "  source ~/miniconda3/etc/profile.d/conda.sh"
-    echo "  conda activate gdcPipeline"
-    echo "Or for shared env:"
-    echo "  source /projects/standard/gdc/public/envs/gdcPipeline/etc/profile.d/conda.sh"
-    echo "  conda activate gdcPipeline"
+    echo "  conda activate /projects/standard/gdc/public/envs/gdcPipeline"
     exit 1
 fi
 
