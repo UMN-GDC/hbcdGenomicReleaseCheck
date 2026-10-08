@@ -37,8 +37,10 @@ echo "  Data dir    : $HBCD_DATA_DIR"
 echo "  Imputation  : $HBCD_IMPUTATION_DIR"
 echo "=========================================="
 
-# ── Conda runner (full path to env, avoids activate/deactivate bug) ────
-CONDA_RUN="/projects/standard/gdc/public/envs/gdcPipeline/bin/conda run -n gdcPipeline"
+# ── Conda runner (full path to conda + env, avoids activate/deactivate bug) ────
+CONDA_EXE="/projects/standard/gdc/public/envs/gdc/bin/conda"
+CONDA_ENV="/projects/standard/gdc/public/envs/gdcPipeline"
+CONDA_RUN="$CONDA_EXE run -p $CONDA_ENV"
 
 # ── Step 25: De-ID + Filter genotypes ───────────────────────────
 echo ""

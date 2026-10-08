@@ -19,8 +19,9 @@ module load plink/2.00-alpha-091019
 module load bcftools
 module load R/4.4.2-openblas-rocky8
 
-# Conda env (run_release_pipeline.sh uses conda run internally)
-# conda activate /projects/standard/gdc/public/envs/gdcPipeline
+# Conda env (run_release_pipeline.sh uses conda run internally with full paths)
+# conda executable: /projects/standard/gdc/public/envs/gdc/bin/conda
+# env path: /projects/standard/gdc/public/envs/gdcPipeline
 
 # Release config (adjust for your release)
 export HBCD_RELEASE=br31p2
