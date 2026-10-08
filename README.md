@@ -13,6 +13,12 @@
 > **Prerequisites**: Phases A & B complete (see [docs](https://hbcd-genomic-release.readthedocs.io/en/latest/running.html#phase-a-qc-derivative-computation))
 
 ### Environment Setup
+best to run this in an srun
+```bash
+srun --mem=8gb --time=8:00:00 --pty bash
+```
+
+
 ```bash
 # MSI modules
 module load plink/2.00-alpha-091019
