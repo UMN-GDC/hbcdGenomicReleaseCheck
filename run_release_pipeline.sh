@@ -37,39 +37,11 @@ echo "  Data dir    : $HBCD_DATA_DIR"
 echo "  Imputation  : $HBCD_IMPUTATION_DIR"
 echo "=========================================="
 
-# ── Conda runner (auto-detect or use env override, avoids activate/deactivate bug) ────
-# Allow override via env vars:
-#   HBCD_CONDA_EXE   — full path to conda executable
-#   HBCD_CONDA_ENV   — full path to conda environment (prefix)
-# Auto-detect common locations if not set
-if [[ -z "${HBCD_CONDA_EXE:-}" ]]; then
-    if [[ -x "/projects/standard/gdc/public/envs/gdc/bin/conda" ]]; then
-        HBCD_CONDA_EXE="/projects/standard/gdc/public/envs/gdc/bin/conda"
-    elif [[ -x "/projects/standard/gdc/public/envs/gdcPipeline/bin/conda" ]]; then
-        HBCD_CONDA_EXE="/projects/standard/gdc/public/envs/gdcPipeline/bin/conda"
-    else
-        HBCD_CONDA_EXE="conda"  # fallback to PATH
-    fi
-fi
-
-if [[ -z "${HBCD_CONDA_ENV:-}" ]]; then
-    if [[ -d "/projects/standard/gdc/public/envs/gdcPipeline" ]]; then
-        HBCD_CONDA_ENV="/projects/standard/gdc/public/envs/gdcPipeline"
-    elif [[ -d "/projects/standard/gdc/public/envs/gdc" ]]; then
-        HBCD_CONDA_ENV="/projects/standard/gdc/public/envs/gdc"
-    else
-        HBCD_CONDA_ENV="gdcPipeline"  # fallback to named env
-    fi
-fi
-
-# Use prefix-based activation (-p) if CONDA_ENV is a path, otherwise named env (-n)
-if [[ "$HBCD_CONDA_ENV" == /* ]]; then
-    CONDA_RUN="$HBCD_CONDA_EXE run -p $HBCD_CONDA_ENV"
-else
-    CONDA_RUN="$HBCD_CONDA_EXE run -n $HBCD_CONDA_ENV"
-fi
-
-export HBCD_CONDA_EXE HBCD_CONDA_ENV CONDA_RUN
+# ── Conda runner (hardcoded paths, avoids activate/deactivate bug) ────
+# Use the conda from the pipeline env itself (has correct shebang)
+CONDA_EXE="/projects/standard/gdc/public/envs/gdcPipeline/bin/conda"
+CONDA_ENV="/projects/standard/gdc/public/envs/gdcPipeline"
+CONDA_RUN="$CONDA_EXE run -p $CONDA_ENV"
 
 # ── Step 25: De-ID + Filter genotypes ───────────────────────────
 echo ""
