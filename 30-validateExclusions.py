@@ -53,7 +53,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 from datetime import datetime
-from _lib import DATA_DIR, get_release_dir, load_additional_excluded_pscids
+from _lib import DATA_DIR, get_release_dir, load_additional_excluded_pscids, load_identifiers
 
 TOTAL_WIDTH = 67
 
@@ -109,11 +109,7 @@ _sep("Loading exclusions")
 excluded_pscids = load_additional_excluded_pscids()
 print(f"  HBCDexclusions.csv pscids           : {len(excluded_pscids):>6}")
 
-identifiers = pd.read_csv(DATA_DIR / "release_identifiers_20260628.csv")
-identifiers = identifiers[identifiers["release_candid"] != "release_candid"]
-identifiers["release_candid"] = pd.to_numeric(identifiers["release_candid"])
-identifiers = identifiers.dropna(subset=["release_candid"])
-identifiers["pscid"] = identifiers["pscid"].astype(str).str.strip()
+identifiers = load_identifiers()
 
 exc_rc = set(
     identifiers.loc[identifiers["pscid"].isin(excluded_pscids), "release_candid"]

@@ -25,6 +25,10 @@ set -euo pipefail
 
 RELEASE_BASE="$(dirname "$RELEASE_DIR")"
 
+# Exported paths for downstream scripts / manual steps
+export HBCD_IDENTIFIERS_FILE="${HBCD_DATA_DIR}/release_identifiers_20260628.csv"
+export HBCD_PAR_VISIT_FILE="${HBCD_DATA_DIR}/par_visit_data_br21_1.tsv"
+
 echo "=========================================="
 echo "  HBCD Release Pipeline"
 echo "  Release tag : $HBCD_RELEASE"
@@ -33,14 +37,13 @@ echo "  Data dir    : $HBCD_DATA_DIR"
 echo "  Imputation  : $HBCD_IMPUTATION_DIR"
 echo "=========================================="
 
-# ── Activate conda environment ──────────────────────────────────
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate gdcPipeline
+# ── Conda runner (full path to env, avoids activate/deactivate bug) ────
+CONDA_RUN="/projects/standard/gdc/public/envs/gdcPipeline/bin/conda run -n gdcPipeline"
 
 # ── Step 25: De-ID + Filter genotypes ───────────────────────────
 echo ""
 echo "=== Step 25: De-ID + Filter genotypes ==="
-python 25-filterGenotypeFiles.py
+$CONDA_RUN python 25-filterGenotypeFiles.py
 
 # ── Step 26: PLINK2 --keep → GDA/merged_chroms ─────────────────
 echo ""
@@ -64,17 +67,17 @@ echo "  Job $JOB_ID complete."
 # ── Step 28: De-identify CNV calls ──────────────────────────────
 echo ""
 echo "=== Step 28: De-identify CNV ==="
-python 28-cnv-deid.py
+$CONDA_RUN python 28-cnv-deid.py
 
 # ── Step 29: Filter all handoff derivatives to release subjects ─
 echo ""
 echo "=== Step 29: Filter handoff derivatives ==="
-python 29-filter_release_outputs.py
+$CONDA_RUN python 29-filter_release_outputs.py
 
 # ── Step 30: Validate exclusion integrity ───────────────────────
 echo ""
 echo "=== Step 30: Validate exclusions ==="
-python 30-validateExclusions.py
+$CONDA_RUN python 30-validateExclusions.py
 
 echo ""
 echo "=========================================="

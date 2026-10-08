@@ -37,8 +37,8 @@ def get_release_staging_dir(release=None):
     return get_release_base(release) / "staging"
 
 
-PAR_VISIT_FILE = "par_visit_data_br21_1.tsv"
-IDENTIFIERS_FILE = "release_identifiers_20260628.csv"
+PAR_VISIT_FILE = os.environ.get("HBCD_PAR_VISIT_FILE", "par_visit_data_br21_1.tsv")
+IDENTIFIERS_FILE = os.environ.get("HBCD_IDENTIFIERS_FILE", "release_identifiers_20260628.csv")
 EXCLUSION_FILE = "HBCD_genetics_QC1_missing_race_LORIS.xlsx"
 
 
