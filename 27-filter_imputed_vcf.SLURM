@@ -140,34 +140,13 @@ echo "--- Finished chr${chr} ---"
 
 # ------------------------------------------------------------------
 # Copy imputation QC statistics files (only on task 0)
-# Copies batch{N}-prefixed copies from c*/statistics/ to release imputed/
+# Delegates to shared copy_imputation_qc.sh
 # ------------------------------------------------------------------
 if [ "$SLURM_ARRAY_TASK_ID" -eq 0 ]; then
     echo "--- Copying imputation QC statistics files ---"
-    for i in 1 2 3; do
-        chunk_dir="${IMPDIR}/c${i}"
-        stats_dir="${chunk_dir}/statistics"
-        if [ ! -d "$stats_dir" ]; then
-            continue
-        fi
-        for f in snps-typed-only.txt snps-excluded.txt chunks-excluded.txt; do
-            src="${stats_dir}/${f}"
-            if [ -f "$src" ]; then
-                dst="${OUTDIR}/batch${i}-${f}"
-                cp "$src" "$dst"
-                echo "  Copied: $src → $dst"
-            fi
-        done
-        # quality-control.html may be at chunk root or in statistics/
-        src="${stats_dir}/quality-control.html"
-        if [ ! -f "$src" ]; then
-            src="${chunk_dir}/quality-control.html"
-        fi
-        if [ -f "$src" ]; then
-            dst="${OUTDIR}/batch${i}-quality-control.html"
-            cp "$src" "$dst"
-            echo "  Copied: $src → $dst"
-        fi
-    done
+    # Source the shared copy function
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    source "${SCRIPT_DIR}/copy_imputation_qc.sh"
+    copy_imputation_qc
     echo "--- Finished copying imputation QC statistics files ---"
 fi
