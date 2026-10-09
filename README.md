@@ -76,6 +76,69 @@ python 30-validateExclusions.py
 python -m pytest tests/ -v
 ```
 
+### Re-run Partial Pipeline (Individual Steps)
+
+To run only a specific step or subset, set the required environment variables and run the script directly. All scripts read from `HBCD_RELEASE`, `HBCD_DATA_DIR`, `HBCD_IMPUTATION_DIR`, `HBCD_IDENTIFIERS_FILE`, `HBCD_PAR_VISIT_FILE`.
+
+**Example: Run just the QC stats copy (after step 27 VCFs done):**
+```bash
+export HBCD_RELEASE=br31p2
+export HBCD_DATA_DIR=/projects/standard/basu_hbcd/shared/data
+export HBCD_IMPUTATION_DIR=/projects/standard/basu_hbcd/shared/hbcdSandboxData
+./copy_imputation_qc.sh
+```
+
+**Example: Run just step 28 (CNV de-ID):**
+```bash
+export HBCD_RELEASE=br31p2
+export HBCD_DATA_DIR=/projects/standard/basu_hbcd/shared/data
+source /projects/standard/basu_hbcd/shared/.venv/bin/activate
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate /projects/standard/gdc/public/envs/gdcPipeline
+python 28-cnv-deid.py
+```
+
+**Example: Run just step 29 (filter derivatives):**
+```bash
+export HBCD_RELEASE=br31p2
+export HBCD_DATA_DIR=/projects/standard/basu_hbcd/shared/data
+export HBCD_IMPUTATION_DIR=/projects/standard/basu_hbcd/shared/hbcdSandboxData
+source /projects/standard/basu_hbcd/shared/.venv/bin/activate
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate /projects/standard/gdc/public/envs/gdcPipeline
+python 29-filter_release_outputs.py
+```
+
+**Example: Run just step 30 (validate exclusions):**
+```bash
+export HBCD_RELEASE=br31p2
+export HBCD_DATA_DIR=/projects/standard/basu_hbcd/shared/data
+source /projects/standard/basu_hbcd/shared/.venv/bin/activate
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate /projects/standard/gdc/public/envs/gdcPipeline
+python 30-validateExclusions.py
+```
+
+**Key environment variables:**
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `HBCD_RELEASE` | Release tag (e.g., br31p2) | br_21p3 |
+| `HBCD_DATA_DIR` | Base data directory | /projects/standard/basu_hbcd/shared/data |
+| `HBCD_IMPUTATION_DIR` | Imputation data root | /projects/standard/basu_hbcd/shared/hbcdSandboxData |
+| `HBCD_IDENTIFIERS_FILE` | Crosswalk CSV path | $HBCD_DATA_DIR/release_identifiers_20260628.csv |
+| `HBCD_PAR_VISIT_FILE` | par_visit TSV path | $HBCD_DATA_DIR/par_visit_data_br21_1.tsv |
+
+**Required environment activation for Python steps:**
+```bash
+# .venv for Python packages
+source /projects/standard/basu_hbcd/shared/.venv/bin/activate
+# Conda for PLINK/bcftools/R
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate /projects/standard/gdc/public/envs/gdcPipeline
+```
+
+---
+
 ### Re-run After Exclusion Changes
 ```bash
 python 25-filterGenotypeFiles.py
